@@ -1,4 +1,4 @@
-static const char *PROGRAM_NAME = "debugdraw_colors";
+static const char *PROGRAM_NAME = "dbgdraw_colors";
 
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
@@ -8,15 +8,15 @@ static const char *PROGRAM_NAME = "debugdraw_colors";
 #include "msh_std.h"
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
-#include "debugdraw.h"
+#include "dbgdraw.h"
 
 #include "GLFW/glfw3.h"
 #include "glad.h"
-#include "debugdraw_opengl45.h"
+#include "dbgdraw_opengl45.h"
 
 typedef struct {
   GLFWwindow* window;
-  dbgdraw_ctx_t* dd_ctx;
+  dd_ctx_t* dd_ctx;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -80,14 +80,16 @@ int32_t init( app_state_t* state ) {
     return 1;
   }
 
-  state->dd_ctx = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error = dbgdraw_init( state->dd_ctx, 1024 * 50, 2048 );
+  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc = { .max_vertices = 1024*50,
+                         .max_commands = 16 };
+  error = dd_init( state->dd_ctx, &desc );
   if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
-  error = dbgdraw_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", 26, 512, 512, &TRUENO_FONT );
+  error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", 26, 512, 512, &TRUENO_FONT );
   if( error ) { exit( EXIT_FAILURE ); }
 
   return 0;
@@ -95,14 +97,14 @@ int32_t init( app_state_t* state ) {
 
 
 void
-draw_color_tile( dbgdraw_ctx_t* dd_ctx, int32_t x, int32_t y, int32_t r, 
+draw_color_tile( dd_ctx_t* dd_ctx, int32_t x, int32_t y, int32_t r, 
                  dd_color_t main_color, dd_color_t variant_color, const char* name )
 {
   int32_t p = 8;
-  dbgdraw_set_font( dd_ctx, TRUENO_FONT );
+  dd_set_font( dd_ctx, TRUENO_FONT );
   int32_t font_size = dd_ctx->fonts[dd_ctx->active_font_idx].size;
 
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
 
 
   dd_color_t text_color = main_color;
@@ -110,31 +112,31 @@ draw_color_tile( dbgdraw_ctx_t* dd_ctx, int32_t x, int32_t y, int32_t r,
   text_color.g = msh_max( text_color.g - 127, 0 );
   text_color.b = msh_max( text_color.b - 127, 0 );
   
-  dbgdraw_set_color( dd_ctx, variant_color );
-  dbgdraw_quad( dd_ctx, msh_vec3( x-p, y-(font_size+p), -1 ).data,
+  dd_set_color( dd_ctx, variant_color );
+  dd_quad( dd_ctx, msh_vec3( x-p, y-(font_size+p), -1 ).data,
                         msh_vec3( x+r+p, y-(font_size+p), -1 ).data,
                         msh_vec3( x+r+p, y+r+p, -1 ).data,
                         msh_vec3( x-p, y+r+p, -1 ).data );
 
-  dbgdraw_set_color( dd_ctx, main_color );
-  dbgdraw_quad( dd_ctx, msh_vec3( x, y, 0 ).data,
+  dd_set_color( dd_ctx, main_color );
+  dd_quad( dd_ctx, msh_vec3( x, y, 0 ).data,
                         msh_vec3( x+r, y, 0 ).data,
                         msh_vec3( x+r, y+r, 0 ).data,
                         msh_vec3( x, y+r, 0 ).data );
   
-  dbgdraw_end_cmd( dd_ctx );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_end_cmd( dd_ctx );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
 
-  dbgdraw_set_color( dd_ctx, text_color );
-  dbgdraw_text_info_t ti = {.vert_align = DBGDRAW_TEXT_CENTER };
-  dbgdraw_text( dd_ctx, msh_vec3(x, y-font_size-p/2, 0).data, name, &ti );
-  dbgdraw_end_cmd( dd_ctx );
+  dd_set_color( dd_ctx, text_color );
+  dd_text_info_t ti = {.vert_align = DBGDRAW_TEXT_CENTER };
+  dd_text( dd_ctx, msh_vec3(x, y-font_size-p/2, 0).data, name, &ti );
+  dd_end_cmd( dd_ctx );
 }
 
 void frame(app_state_t* state) 
 {
   GLFWwindow* window    = state->window;
-  dbgdraw_ctx_t* dd_ctx = state->dd_ctx;
+  dd_ctx_t* dd_ctx = state->dd_ctx;
  
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
   glClearColor( 0.3f, 0.3f, 0.45f, 1.0f );
@@ -146,7 +148,12 @@ void frame(app_state_t* state)
   msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
   msh_vec4_t viewport = msh_vec4( 0, 0, w, h );
   msh_mat4_t proj = msh_ortho( 0, w, 0, h, 0.01, 10.0 );
-  dbgdraw_new_frame( state->dd_ctx, view.data, proj.data, viewport.data, cam_pos.data, h, true );
+  dd_new_frame_info_t info = { .view_matrix       = view.data,
+                               .projection_matrix = proj.data,
+                               .viewport_size     = viewport.data,
+                               .vertical_fov      = h,
+                               .projection_type   = DBGDRAW_ORTHOGRAPHIC };
+  dd_new_frame( dd_ctx, &info );
 
   int32_t size = 96;
   int32_t spacing = 26;
@@ -166,14 +173,14 @@ void frame(app_state_t* state)
   draw_color_tile( dd_ctx, x, y, size, DBGDRAW_BROWN, DBGDRAW_LIGHT_BROWN, "Brown" );       x = spacing;
   y -= (size+spacing);
 
-  dbgdraw_render( dd_ctx );
+  dd_render( dd_ctx );
 
 }
 
 
 void cleanup( app_state_t* state )
 {
-  dbgdraw_term( state->dd_ctx );
+  dd_term( state->dd_ctx );
   glfwTerminate();
   free( state );
 }

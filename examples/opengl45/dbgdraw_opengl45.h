@@ -4,7 +4,7 @@
 //TODO(maciej): Don't do bindless, they don't work on Intel
 
 
-typedef struct dbgdraw_render_backend {
+typedef struct dd_render_backend {
   GLuint base_program;
   GLuint lines_program;
   GLuint vao;
@@ -13,11 +13,11 @@ typedef struct dbgdraw_render_backend {
   GLuint font_tex_ids[16];
 
   GLuint line_data_texture_id;
-} dbgdraw_render_backend_t;
+} dd_render_backend_t;
 
 
 
-void dbgdraw__gl_check(const char* filename, uint32_t lineno)
+void dd__gl_check(const char* filename, uint32_t lineno)
 {
   uint32_t error = glGetError();
 
@@ -27,10 +27,10 @@ void dbgdraw__gl_check(const char* filename, uint32_t lineno)
   }
 }
 
-#define GLCHECK(x) do{ x; dbgdraw__gl_check(__FILE__, __LINE__); } while(0)
+#define GLCHECK(x) do{ x; dd__gl_check(__FILE__, __LINE__); } while(0)
 
 int8_t
-dbgdraw__check_gl_program_status( GLuint program_id, bool report_error )
+dd__check_gl_program_status( GLuint program_id, bool report_error )
 {
   int32_t successful_linking = 0;
   glGetProgramiv( program_id, GL_LINK_STATUS, &successful_linking );
@@ -48,7 +48,7 @@ dbgdraw__check_gl_program_status( GLuint program_id, bool report_error )
 }
 
 int8_t
-dbgdraw__check_gl_shader_status( GLuint shader_id, bool report_error )
+dd__check_gl_shader_status( GLuint shader_id, bool report_error )
 {
   int32_t successful_linking = 0;
   glGetShaderiv( shader_id, GL_COMPILE_STATUS, &successful_linking );
@@ -66,18 +66,18 @@ dbgdraw__check_gl_shader_status( GLuint shader_id, bool report_error )
 }
 
 GLuint
-dbgdraw__gl_compile_shader_src( GLuint shader_type, const char* shader_src )
+dd__gl_compile_shader_src( GLuint shader_type, const char* shader_src )
 {
   const GLuint shader = glCreateShader( shader_type );
   glShaderSource( shader, 1, &shader_src, NULL );
   glCompileShader( shader );
-  int error = dbgdraw__check_gl_shader_status( shader, true );
+  int32_t error = dd__check_gl_shader_status( shader, true );
   if( error ) { exit(-1); }
   return shader;
 }
 
 GLuint
-dbgdraw__gl_link_program( GLuint vertex_shader, GLuint geometry_shader, GLuint fragment_shader )
+dd__gl_link_program( GLuint vertex_shader, GLuint geometry_shader, GLuint fragment_shader )
 {
   GLuint program = glCreateProgram();
 
@@ -91,7 +91,7 @@ dbgdraw__gl_link_program( GLuint vertex_shader, GLuint geometry_shader, GLuint f
   if( geometry_shader ) { glDetachShader( program, geometry_shader ); glDeleteShader(geometry_shader); }
   if( fragment_shader ) { glDetachShader( program, fragment_shader ); glDeleteShader(fragment_shader); }
 
-  dbgdraw__check_gl_program_status( program, true );
+  dd__check_gl_program_status( program, true );
   return program;
 }
 
@@ -102,31 +102,31 @@ void init_base_shaders_source( const char** vert_shdr, const char** frag_shdr_sr
 void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shdr_src );
 
 int32_t
-dbgdraw_backend_init( dbgdraw_ctx_t* ctx )
+dd_backend_init( dd_ctx_t* ctx )
 {
-  static dbgdraw_render_backend_t backend = {0};
+  static dd_render_backend_t backend = {0};
   ctx->backend = &backend;
 
   const char* base_vert_shdr_src = NULL;
   const char* base_frag_shdr_src = NULL;
   init_base_shaders_source( &base_vert_shdr_src, &base_frag_shdr_src );
 
-  GLuint vertex_shader   = dbgdraw__gl_compile_shader_src( GL_VERTEX_SHADER, base_vert_shdr_src );
-  GLuint fragment_shader = dbgdraw__gl_compile_shader_src( GL_FRAGMENT_SHADER, base_frag_shdr_src );
-  ctx->backend->base_program  = dbgdraw__gl_link_program( vertex_shader, 0, fragment_shader );
+  GLuint vertex_shader   = dd__gl_compile_shader_src( GL_VERTEX_SHADER, base_vert_shdr_src );
+  GLuint fragment_shader = dd__gl_compile_shader_src( GL_FRAGMENT_SHADER, base_frag_shdr_src );
+  ctx->backend->base_program  = dd__gl_link_program( vertex_shader, 0, fragment_shader );
 
   const char* line_vert_shdr_src = NULL;
   const char* line_frag_shdr_src = NULL;
   init_line_shaders_source( &line_vert_shdr_src, &line_frag_shdr_src );
 
-  GLuint vertex_shader2   = dbgdraw__gl_compile_shader_src( GL_VERTEX_SHADER, line_vert_shdr_src );
-  GLuint fragment_shader2 = dbgdraw__gl_compile_shader_src( GL_FRAGMENT_SHADER, line_frag_shdr_src );
-  ctx->backend->lines_program  = dbgdraw__gl_link_program( vertex_shader2, 0, fragment_shader2 );
+  GLuint vertex_shader2   = dd__gl_compile_shader_src( GL_VERTEX_SHADER, line_vert_shdr_src );
+  GLuint fragment_shader2 = dd__gl_compile_shader_src( GL_FRAGMENT_SHADER, line_frag_shdr_src );
+  ctx->backend->lines_program  = dd__gl_link_program( vertex_shader2, 0, fragment_shader2 );
 
   GLCHECK( glCreateVertexArrays(1, &backend.vao ) );
 
   GLCHECK( glCreateBuffers( 1, &backend.vbo ) );
-  GLCHECK( glNamedBufferStorage( backend.vbo, ctx->verts_cap * sizeof(dbgdraw_vertex_t), NULL, GL_DYNAMIC_STORAGE_BIT ) );
+  GLCHECK( glNamedBufferStorage( backend.vbo, ctx->verts_cap * sizeof(dd_vertex_t), NULL, GL_DYNAMIC_STORAGE_BIT ) );
 
   GLCHECK( glCreateTextures( GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id ) );
   GLCHECK( glTextureBuffer( backend.line_data_texture_id, GL_RGBA32F, backend.vbo ) );
@@ -137,15 +137,15 @@ dbgdraw_backend_init( dbgdraw_ctx_t* ctx )
 
   GLuint color_loc    = glGetAttribLocation( backend.base_program, "in_color" );
 
-  GLCHECK( glVertexArrayVertexBuffer( backend.vao, bind_idx, backend.vbo, 0, sizeof(dbgdraw_vertex_t) ) );
+  GLCHECK( glVertexArrayVertexBuffer( backend.vao, bind_idx, backend.vbo, 0, sizeof(dd_vertex_t) ) );
 
   GLCHECK( glEnableVertexArrayAttrib( backend.vao, pos_size_loc ) );
   GLCHECK( glEnableVertexArrayAttrib( backend.vao, uv_loc ) );
   GLCHECK( glEnableVertexArrayAttrib( backend.vao, color_loc ) );
 
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, pos_size_loc, 4, GL_FLOAT,         GL_FALSE, offsetof(dbgdraw_vertex_t, pos_size) ) );
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, uv_loc,       2, GL_FLOAT,         GL_FALSE, offsetof(dbgdraw_vertex_t, uv) ) );
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, color_loc,    4, GL_UNSIGNED_BYTE, GL_TRUE,  offsetof(dbgdraw_vertex_t, col) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, pos_size_loc, 4, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, pos_size) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, uv_loc,       2, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, uv) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, color_loc,    4, GL_UNSIGNED_BYTE, GL_TRUE,  offsetof(dd_vertex_t, col) ) );
 
   GLCHECK( glVertexArrayAttribBinding( backend.vao, pos_size_loc, bind_idx ) );
   GLCHECK( glVertexArrayAttribBinding( backend.vao, uv_loc, bind_idx ) );
@@ -156,12 +156,12 @@ dbgdraw_backend_init( dbgdraw_ctx_t* ctx )
 
 // Break this into update and render functions!
 int32_t 
-dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
+dd_backend_render( dd_ctx_t *ctx )
 {
   if( !ctx->commands_len ) { return DBGDRAW_ERR_OK; }
 
   // Update the data --> May be unnecessary with persistently mapped buffers
-  GLCHECK( glNamedBufferSubData( ctx->backend->vbo, 0, ctx->verts_len * sizeof(dbgdraw_vertex_t), ctx->verts_data ) );
+  GLCHECK( glNamedBufferSubData( ctx->backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data ) );
   
   // Setup required ogl state
   // TODO(maciej): Rethink how commands are drawn --> sorting breaks 2d draws, since we do not do any depth testing
@@ -184,7 +184,7 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
 
   for( int32_t i = 0; i < ctx->commands_len; ++i )
   {
-    dbgdraw_cmd_t *cmd = ctx->commands + i;
+    dd_cmd_t *cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
 
     if( cmd->draw_mode == DBGDRAW_MODE_FILL || cmd->draw_mode == DBGDRAW_MODE_TEXT )
@@ -252,7 +252,7 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
 
 #if DBGDRAW_HAS_STB_TRUETYPE
 int32_t
-dbgdraw_backend_init_font_texture( dbgdraw_ctx_t* ctx, const uint8_t* data, int32_t width, int32_t height, 
+dd_backend_init_font_texture( dd_ctx_t* ctx, const uint8_t* data, int32_t width, int32_t height, 
                                                        uint32_t* tex_id )
 {
   GLCHECK( glCreateTextures( GL_TEXTURE_2D, 1, &ctx->backend->font_tex_ids[ctx->fonts_len] ) );
@@ -271,7 +271,7 @@ dbgdraw_backend_init_font_texture( dbgdraw_ctx_t* ctx, const uint8_t* data, int3
 #endif
 
 int32_t
-dbgdraw_backend_term( dbgdraw_ctx_t* ctx )
+dd_backend_term( dd_ctx_t* ctx )
 {
   glDeleteVertexArrays( 1, &ctx->backend->vao );
   glDeleteBuffers( 1, &ctx->backend->vbo );
@@ -377,8 +377,8 @@ void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shd
         float u_width        = u_viewport_size[0];
         float u_height       = u_viewport_size[1];
         float u_aspect_ratio = u_height / u_width;
-        int   u_base_idx     = u_command_info[0];
-        int   u_count        = u_command_info[1];
+        int   u_base_idx  = u_command_info[0];
+        int   u_count     = u_command_info[1];
 
         // Get indices of line segments
         int base_idx = 2 * u_base_idx;

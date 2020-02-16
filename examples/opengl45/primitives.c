@@ -1,4 +1,4 @@
-static const char *PROGRAM_NAME = "debugdraw_primitives.c";
+static const char *PROGRAM_NAME = "dbgdraw_primitives.c";
 
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
@@ -11,19 +11,19 @@ static const char *PROGRAM_NAME = "debugdraw_primitives.c";
 #include "msh_camera.h"
 #include "stb_truetype.h"
 
-#include "debugdraw.h"
+#include "dbgdraw.h"
 #include "overlay.h"
 
 #include "GLFW/glfw3.h"
 #include "glad.h"
-#include "debugdraw_opengl45.h"
+#include "dbgdraw_opengl45.h"
 
 
 typedef struct {
   GLFWwindow* window;
   msh_camera_t* camera;
-  dbgdraw_ctx_t* primitives;
-  dbgdraw_ctx_t* overlay;
+  dd_ctx_t* primitives;
+  dd_ctx_t* overlay;
   int32_t proggy_square_font;
 } app_state_t;
 
@@ -73,13 +73,13 @@ key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, 
 int32_t
 main( void )
 {
-  int32_t        error_code = 0;
+  int32_t        error = 0;
   app_state_t*   state      = calloc( 1, sizeof(app_state_t) );
   GLFWwindow*    window     = NULL;
-  dbgdraw_ctx_t* primitives = NULL;
+  dd_ctx_t* primitives = NULL;
 
-  error_code = init( state );
-  if( error_code ) { goto main_return; }
+  error = init( state );
+  if( error ) { goto main_return; }
 
   window  = state->window;
   primitives  = state->primitives;
@@ -90,20 +90,20 @@ main( void )
   }
 
 main_return:
-  dbgdraw_term( primitives );
+  dd_term( primitives );
   glfwTerminate();
   free( state );
-  return error_code;
+  return error;
 }
 
 
 int32_t
 init( app_state_t* state )
 {
-  int32_t error_code = 0;
+  int32_t error = 0;
 
-  error_code = !(glfwInit());
-  if( error_code )
+  error = !(glfwInit());
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
     return 1;
@@ -125,32 +125,41 @@ init( app_state_t* state )
   glfwSetKeyCallback( state->window, key_callback);
   glfwMakeContextCurrent( state->window );
   glfwSwapInterval(1);
-  
+
   if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
   {
     fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
     return 1;
   }
 
-  state->primitives = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error_code = dbgdraw_init( state->primitives, 1024 * 50, 256 );
-  if( error_code )
+  state->primitives = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc_primitives = { .max_vertices = 1024*50,
+                                    .max_commands = 16,
+                                    .detail_level = 2,
+                                    .enable_frustum_cull = true,
+                                    .enable_depth_test = true };
+  error = dd_init( state->primitives, &desc_primitives );
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
 
-  state->overlay = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error_code = dbgdraw_init( state->overlay, 1024 * 50, 256 );
-  if( error_code )
+  state->overlay = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc_overlay = { .max_vertices = 1024*50,
+                                 .max_commands = 16,
+                                 .enable_frustum_cull = false,
+                                 .enable_depth_test = false };
+  error = dd_init( state->overlay, &desc_overlay );
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
 
-  error_code = dbgdraw_init_font_from_file( state->overlay, "examples/fonts/ProggySquare.ttf", 11, 512, 512, 
+  error = dd_init_font_from_file( state->overlay, "examples/fonts/ProggySquare.ttf", 11, 512, 512, 
                                                                                           &state->proggy_square_font );
-  if( error_code )
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to read font\n" );
     return 1;
@@ -179,8 +188,8 @@ frame( app_state_t* state )
   dt1 = msh_time_now();
 
   GLFWwindow*    window     = state->window;
-  dbgdraw_ctx_t* primitives = state->primitives;
-  dbgdraw_ctx_t* overlay    = state->overlay;
+  dd_ctx_t* primitives = state->primitives;
+  dd_ctx_t* overlay    = state->overlay;
   msh_camera_t*  cam        = state->camera;
  
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
@@ -238,15 +247,19 @@ frame( app_state_t* state )
   
   detail_lvl = msh_clamp( detail_lvl, 0, 4 );
 
-  dbgdraw_new_frame( primitives, cam->view.data, cam->proj.data,
-                                 cam->viewport.data, cam->location.data,
-                                 cam->fovy, cam->use_ortho );
+  dd_new_frame_info_t info = { .view_matrix       = cam->view.data,
+                               .projection_matrix = cam->proj.data,
+                               .viewport_size     = cam->viewport.data,
+                               .vertical_fov      = cam->fovy,
+                               .projection_type   = DBGDRAW_PERSPECTIVE };
+  dd_new_frame( primitives, &info );
+
   primitives->enable_depth_test = true;
   primitives->detail = detail_lvl;
 
 #define N_TIMES 100
   static float times[N_TIMES] = {};
-  static int time_idx         = 0;
+  static int32_t time_idx         = 0;
 
   msh_vec3_t min_pt       = msh_vec3( -0.5f, -0.5f, -0.5f );
   msh_vec3_t max_pt       = msh_vec3(  0.5f,  0.5f,  0.5f );
@@ -255,22 +268,21 @@ frame( app_state_t* state )
   msh_vec3_t cur_loc      = msh_vec3(  0.0f,  0.0f,  0.0f );
   msh_mat4_t proj         = msh_perspective( msh_deg2rad(45.0f), 4.0f / 3.0f, 0.5f, 1.5f );
   msh_mat4_t view         = msh_mat4_identity();
-  msh_vec4_t viewport     = cam->viewport;
   dt1 = msh_time_now();
 
   dd_color_t* color = NULL;
-  for( int draw_mode = DBGDRAW_MODE_FILL; draw_mode < DBGDRAW_MODE_COUNT; ++draw_mode )
+  for( int32_t draw_mode = DBGDRAW_MODE_FILL; draw_mode < DBGDRAW_MODE_COUNT; ++draw_mode )
   {
     switch( draw_mode )
     {
       case DBGDRAW_MODE_POINT:
         if( !show_points ) { continue; }
-        dbgdraw_set_primitive_size( primitives, 5.0f );
+        dd_set_primitive_size( primitives, 5.0f );
         color = colors + 6;
         break;
       case DBGDRAW_MODE_STROKE:
         if( !show_lines) { continue; }
-        dbgdraw_set_primitive_size( primitives, 3.0f );
+        dd_set_primitive_size( primitives, 3.0f );
         color = colors + 3;
         break;
       case DBGDRAW_MODE_FILL:
@@ -282,83 +294,87 @@ frame( app_state_t* state )
         break;
     }
 
-    dbgdraw_begin_cmd( primitives, draw_mode );
+    dd_begin_cmd( primitives, draw_mode );
     cur_loc = msh_vec3( -3, 0, 0 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_aabb( primitives, msh_vec3_add(cur_loc, min_pt).data, msh_vec3_add(cur_loc, max_pt).data );
+    dd_set_color( primitives, *color );
+    dd_aabb( primitives, msh_vec3_add(cur_loc, min_pt).data, msh_vec3_add(cur_loc, max_pt).data );
 
     cur_loc = msh_vec3( -1, 0, 0 );
-    dbgdraw_set_color( primitives, *color );
+    dd_set_color( primitives, *color );
     msh_mat3_t m = msh_mat3_identity();
     m.col[0] = msh_vec3_normalize( msh_vec3( 1.5, 0.0, 0.5 ) );
     m.col[2] = msh_vec3_normalize( msh_vec3_cross( m.col[0], m.col[1] ) );
     m.col[0] = msh_vec3_scalar_mul( m.col[0], 0.25 );
     m.col[1] = msh_vec3_scalar_mul( m.col[1], 0.5 );
     m.col[2] = msh_vec3_scalar_mul( m.col[2], 0.5 );
-    dbgdraw_obb( primitives, cur_loc.data, m.data );
+    dd_obb( primitives, cur_loc.data, m.data );
 
     cur_loc = msh_vec3( 1, 0, 0 );
     view    = msh_look_at( msh_vec3_add( cur_loc, msh_vec3( 0.0f, 0.0f, 1.0f ) ),
                            cur_loc, 
                            msh_vec3(  0.0f, 1.0f, 0.0f ) );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_frustum( primitives, view.data, proj.data );
+    dd_set_color( primitives, *color );
+    dd_frustum( primitives, view.data, proj.data );
 
     cur_loc = msh_vec3( 3, 0, 0 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0, -0.5)).data,
-                          msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0, -0.5)).data,
-                          msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0,  0.5)).data,
-                          msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0,  0.5)).data );
+    dd_set_color( primitives, *color );
+    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0, -0.5)).data,
+                         msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0, -0.5)).data,
+                         msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0,  0.5)).data,
+                         msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0,  0.5)).data );
     color++;
 
     cur_loc = msh_vec3( -3, 0, -2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_circle( primitives, cur_loc.data, 0.5f );
+    dd_set_color( primitives, *color );
+    dd_circle( primitives, cur_loc.data, 0.5f );
     
 
     cur_loc = msh_vec3( -1, 0, -2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_arc( primitives, cur_loc.data, 0.5f, MSH_TWO_PI * 0.8 );
+    dd_set_color( primitives, *color );
+    dd_arc( primitives, cur_loc.data, 0.5f, MSH_TWO_PI * 0.8 );
 
     cur_loc = msh_vec3( 1, 0, -2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_sphere( primitives, cur_loc.data, 0.5f );
+    dd_set_color( primitives, *color );
+    dd_sphere( primitives, cur_loc.data, 0.5f );
     
     cur_loc = msh_vec3( 3, 0, -2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_torus( primitives, cur_loc.data, 0.5f, 0.1f );
+    dd_set_color( primitives, *color );
+    dd_torus( primitives, cur_loc.data, 0.5f, 0.1f );
     color++;
 
     cur_loc = msh_vec3( -3, 0, 2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    dd_set_color( primitives, *color );
+    dd_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
 
 
     cur_loc = msh_vec3( -1, 0, 2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_cone( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    dd_set_color( primitives, *color );
+    dd_cone( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
 
     cur_loc = msh_vec3( 1, 0, 2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_conical_frustum( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f, 0.25f );
+    dd_set_color( primitives, *color );
+    dd_conical_frustum( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f, 0.25f );
 
     cur_loc = msh_vec3(  3, 0, 2 );
-    dbgdraw_set_color( primitives, *color );
-    dbgdraw_arrow( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.3f, 0.45f, 0.25f );
+    dd_set_color( primitives, *color );
+    dd_arrow( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.3f, 0.45f, 0.25f );
 
-    dbgdraw_end_cmd( primitives );
+    dd_end_cmd( primitives );
   
   }
 
-  dbgdraw_render( primitives );
+  dd_render( primitives );
 
   if( show_overlay )
   {
     msh_vec3_t cam_pos = msh_vec3( 0, 0, 5 );
     proj = msh_ortho( 0, win_width, 0, win_height, 0.01, 100.0 );
     view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
-    dbgdraw_new_frame( overlay, view.data, proj.data, viewport.data, cam_pos.data, win_height, 1 );
+    info.view_matrix       = view.data;
+    info.projection_matrix = proj.data;
+    info.vertical_fov      = win_height;
+    info.projection_type   = DBGDRAW_ORTHOGRAPHIC;
+    dd_new_frame( overlay, &info );
 
     int32_t x = win_width - 260;
     int32_t y = 10;
@@ -377,7 +393,7 @@ frame( app_state_t* state )
 
     draw_legend( overlay, legend, x, y );
 
-    dbgdraw_render( overlay );
+    dd_render( overlay );
   }
 
   glfwSwapBuffers( window );

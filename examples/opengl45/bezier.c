@@ -1,4 +1,4 @@
-static const char *PROGRAM_NAME = "debugdraw_bezier";
+static const char *PROGRAM_NAME = "dbgdraw_bezier";
 
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
@@ -8,16 +8,16 @@ static const char *PROGRAM_NAME = "debugdraw_bezier";
 #include "msh_std.h"
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
-#include "debugdraw.h"
+#include "dbgdraw.h"
 
 #include "GLFW/glfw3.h"
 #include "glad.h"
-#include "debugdraw_opengl45.h"
+#include "dbgdraw_opengl45.h"
 
 
 typedef struct {
   GLFWwindow* window;
-  dbgdraw_ctx_t* dd_ctx;
+  dd_ctx_t* dd_ctx;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -81,57 +81,59 @@ int32_t init( app_state_t* state ) {
     return 1;
   }
 
-  state->dd_ctx = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error = dbgdraw_init( state->dd_ctx, 1024 * 50, 2048 );
-  error = dbgdraw_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 32, 512, 512, &CMU_FONT );
-  error = dbgdraw_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 20, 512, 512, &CMU_FONT_SMALL );
+  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc = { .max_vertices = 1024*200,
+                         .max_commands = 16,
+                         .line_antialias_radius = 2.0f };
+  error = dd_init( state->dd_ctx, &desc );
+  error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 32, 512, 512, &CMU_FONT );
+  error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 20, 512, 512, &CMU_FONT_SMALL );
   if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
-  // Set antialiasing
-  state->dd_ctx->aa_radius = dd_vec2( 2.0f, 0.0f );
+
 
   return 0;
 }
 
 void
-draw_line_segments( dbgdraw_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, dd_color_t color, float width )
+draw_line_segments( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, dd_color_t color, float width )
 {
-  dbgdraw_set_color( dd_ctx, color );
-  dbgdraw_set_primitive_size( dd_ctx, width );
+  dd_set_color( dd_ctx, color );
+  dd_set_primitive_size( dd_ctx, width );
 
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
   for( int32_t i = 0; i < n_pts-1; ++i )
   {
-    dbgdraw_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
+    dd_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
   }
-  dbgdraw_end_cmd( dd_ctx );
+  dd_end_cmd( dd_ctx );
 }
 
 void
-draw_points( dbgdraw_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, 
+draw_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, 
              dd_color_t pt_fill_color, dd_color_t pt_stroke_color, float radius )
 {
   dd_ctx->detail = 3;
   
-  dbgdraw_set_color( dd_ctx, pt_fill_color );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+  dd_set_color( dd_ctx, pt_fill_color );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   for( int32_t i = 0; i < n_pts ; ++i )
   {
-    dbgdraw_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
   }
-  dbgdraw_end_cmd( dd_ctx );
+  dd_end_cmd( dd_ctx );
 
-  dbgdraw_set_color( dd_ctx, pt_stroke_color );
-  dbgdraw_set_primitive_size( dd_ctx, 2.0f );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  dd_set_color( dd_ctx, pt_stroke_color );
+  dd_set_primitive_size( dd_ctx, 2.0f );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
   for( int32_t i = 0; i < n_pts ; ++i )
   {
-    dbgdraw_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
   }
-  dbgdraw_end_cmd( dd_ctx );
+  dd_end_cmd( dd_ctx );
   
   dd_ctx->detail = 2;
 }
@@ -193,35 +195,35 @@ dd_vec2_t quartic_interpolation_pts( dd_vec2_t pt_a, dd_vec2_t pt_b, dd_vec2_t p
 }
 
 void
-draw_labeled_points( dbgdraw_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t n_pts, 
+draw_labeled_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t n_pts, 
                      dd_color_t pt_fill_color, dd_color_t pt_stroke_color, dd_color_t text_color, float radius )
 {
   draw_points(dd_ctx, pts, n_pts, pt_fill_color, pt_stroke_color, radius );
   
   float offset_x = radius;
   float offset_y = -(25.0f + radius);
-  dbgdraw_set_color( dd_ctx, text_color );
-  dbgdraw_set_font( dd_ctx, CMU_FONT );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_set_color( dd_ctx, text_color );
+  dd_set_font( dd_ctx, CMU_FONT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
   char buf[128] = {0};
   for( int32_t i = 0; i < n_pts ; ++i )
   {
     char* underscore = strchr( pts_labels[i], '_' );
     strncpy( buf, pts_labels[i], (underscore - pts_labels[i]) );
-    dbgdraw_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, buf, NULL );
+    dd_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, buf, NULL );
   }
-  dbgdraw_end_cmd( dd_ctx );
+  dd_end_cmd( dd_ctx );
 
   offset_x = 15.0f + radius;
   offset_y = -(30.0f + radius );
-  dbgdraw_set_font( dd_ctx, CMU_FONT_SMALL );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_set_font( dd_ctx, CMU_FONT_SMALL );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
   for( int32_t i = 0; i < n_pts ; ++i )
   {
     char* underscore = strchr( pts_labels[i], '_' );
-    dbgdraw_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, underscore+1, NULL );
+    dd_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, underscore+1, NULL );
   }
-  dbgdraw_end_cmd( dd_ctx );
+  dd_end_cmd( dd_ctx );
 }
 
 float sigmoid( float x, float a, float b, float k )
@@ -238,7 +240,7 @@ float smoothstep(float edge0, float edge1, float x) {
 void frame(app_state_t* state) 
 {
   GLFWwindow* window    = state->window;
-  dbgdraw_ctx_t* dd_ctx = state->dd_ctx;
+  dd_ctx_t* dd_ctx = state->dd_ctx;
  
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
   glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
@@ -251,8 +253,13 @@ void frame(app_state_t* state)
   msh_vec4_t viewport = msh_vec4( 0, 0, w, h );
   msh_mat4_t proj = msh_ortho( 0, w, 0, h, -100.0, 100.0 );
 
-  // TODO(maciej): Reset transformation at the start of each frame
-  dbgdraw_new_frame( state->dd_ctx, view.data, proj.data, viewport.data, cam_pos.data, h, true );
+  dd_new_frame_info_t info = { .view_matrix       = view.data,
+                               .projection_matrix = proj.data,
+                               .viewport_size     = viewport.data,
+                               .vertical_fov      = h,
+                               .projection_type   = DBGDRAW_ORTHOGRAPHIC };
+  dd_new_frame( dd_ctx, &info );
+
 
   static float at = 0.0f;
   static float delta_t = 0.01f;
@@ -304,7 +311,7 @@ void frame(app_state_t* state)
     float ct = (i) * ( 1.0 / (bezier_pts_cap-1) );
     bezier_pts[i] = quartic_interpolation_pts( control_pts[0], control_pts[1], control_pts[2], control_pts[3], control_pts[4], ct );
   }
-  int idx = 1;
+  int32_t idx = 1;
   if( bezier_pts_len > 1 ) idx = bezier_pts_len - 1;
   bezier_pts[ idx ] = quartic_interpolation_pts( control_pts[0], control_pts[1], control_pts[2], control_pts[3], control_pts[4], t );
 
@@ -327,13 +334,13 @@ void frame(app_state_t* state)
   draw_labeled_points( dd_ctx, control_pts, control_pts_labels, NPTS,
                        DBGDRAW_LIGHT_GRAY, DBGDRAW_GRAY, DBGDRAW_BLACK, 5.0f );
 
-  dbgdraw_render( dd_ctx );
+  dd_render( dd_ctx );
 }
 
 
 void cleanup( app_state_t* state )
 {
-  dbgdraw_term( state->dd_ctx );
+  dd_term( state->dd_ctx );
   glfwTerminate();
   free( state );
 }

@@ -1,4 +1,4 @@
-static const char *PROGRAM_NAME = "debugdraw_frustum_culling";
+static const char *PROGRAM_NAME = "dbgdraw_frustum_culling";
 
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
@@ -10,17 +10,17 @@ static const char *PROGRAM_NAME = "debugdraw_frustum_culling";
 #include "msh_vec_math.h"
 #include "msh_camera.h"
 #include "stb_truetype.h"
-#include "debugdraw.h"
+#include "dbgdraw.h"
 
 #include "GLFW/glfw3.h"
 #include "glad.h"
 #include "gui.h"
-#include "debugdraw_opengl45.h"
+#include "dbgdraw_opengl45.h"
 
 
 typedef struct {
   GLFWwindow* window;
-  dbgdraw_ctx_t* dd_ctx;
+  dd_ctx_t* dd_ctx;
   msh_camera_t* camera;
 } app_state_t;
 
@@ -71,14 +71,14 @@ key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, 
 int32_t
 main( void )
 {
-  int32_t error_code    = 0;
+  int32_t error    = 0;
   app_state_t* state    = calloc( 1, sizeof(app_state_t) );
 
   GLFWwindow* window    = NULL;
-  dbgdraw_ctx_t* dd_ctx = NULL;
+  dd_ctx_t* dd_ctx = NULL;
 
-  error_code = init( state );
-  if( error_code ) { goto main_return; }
+  error = init( state );
+  if( error ) { goto main_return; }
 
   window  = state->window;
   dd_ctx  = state->dd_ctx;
@@ -92,19 +92,19 @@ main( void )
   }
 
 main_return:
-  dbgdraw_term( dd_ctx );
+  dd_term( dd_ctx );
   glfwTerminate();
   free( state );
-  return error_code;
+  return error;
 }
 
 int32_t
 init( app_state_t* state )
 {
-  int32_t error_code = 0;
+  int32_t error = 0;
 
-  error_code = !(glfwInit());
-  if( error_code )
+  error = !(glfwInit());
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
     return 1;
@@ -132,22 +132,26 @@ init( app_state_t* state )
     return 1;
   }
 
-  state->dd_ctx = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error_code = dbgdraw_init( state->dd_ctx, 1024 * 300, 2048 );
-  if( error_code )
+  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc = { .max_vertices = 1024*200,
+                         .max_commands = 16,
+                         .detail_level = 2,
+                         .enable_frustum_cull = true,
+                         .enable_depth_test = true };
+  error = dd_init( state->dd_ctx, &desc );
+
+  if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
-  state->dd_ctx->enable_depth_test = true;
-  state->dd_ctx->detail            = 2;
   
   state->camera = calloc( 1, sizeof(msh_camera_t) );
-  msh_camera_init( state->camera, &(msh_camera_desc_t){ .eye = msh_vec3( -4, 3.5, -6 ),
+  msh_camera_init( state->camera, &(msh_camera_desc_t){ .eye = msh_vec3( -6, 2.5, -6 ),
                                                         .center = msh_vec3_zeros(),
                                                         .up = msh_vec3_posy(),
                                                         .viewport = msh_vec4( 0, 0, win_width, win_height),
-                                                        .fovy = msh_rad2deg(60.0f),
+                                                        .fovy = msh_rad2deg( 60.0f ),
                                                         .znear = 0.01f,
                                                         .zfar = 100.0f,
                                                         .use_ortho = false } );
@@ -158,7 +162,7 @@ void
 frame( app_state_t* state )
 {
   GLFWwindow* window    = state->window;
-  dbgdraw_ctx_t* dd_ctx = state->dd_ctx;
+  dd_ctx_t* dd_ctx = state->dd_ctx;
   msh_camera_t* cam     = state->camera;
  
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
@@ -201,8 +205,12 @@ frame( app_state_t* state )
     glViewport( cam->viewport.x, cam->viewport.y, cam->viewport.z, cam->viewport.w );
   }
 
-
-  dbgdraw_new_frame( dd_ctx, cam->view.data, cam->proj.data, cam->viewport.data, cam->location.data, cam->fovy, cam->use_ortho );
+  dd_new_frame_info_t info = { .view_matrix       = cam->view.data,
+                               .projection_matrix = cam->proj.data,
+                               .viewport_size     = cam->viewport.data,
+                               .vertical_fov      = cam->fovy,
+                               .projection_type   = DBGDRAW_ORTHOGRAPHIC };
+  dd_new_frame( dd_ctx, &info );
 
   static float angle = 0.0f;
   if( angle > MSH_TWO_PI ) { angle -= MSH_TWO_PI; }
@@ -216,16 +224,16 @@ frame( app_state_t* state )
   /* Switch the dbgdraw view/projection matrices to the one of a testing frustum */
   memcpy( dd_ctx->proj.data, proj.data, sizeof(dd_ctx->proj));
   memcpy( dd_ctx->view.data, view.data, sizeof(dd_ctx->view));
-  dbgdraw_extract_frustum_planes( dd_ctx );
+  dd_extract_frustum_planes( dd_ctx );
 
   /* Draw spheres */
   float radius = 0.21;
-  dbgdraw_mode_t modes[2] = {DBGDRAW_MODE_STROKE, DBGDRAW_MODE_FILL};
+  dd_mode_t modes[2] = {DBGDRAW_MODE_STROKE, DBGDRAW_MODE_FILL};
   dd_color_t pass_colors[2] = {DBGDRAW_LIGHT_GREEN, DBGDRAW_GREEN };
   dd_color_t cull_colors[2] = {DBGDRAW_LIGHT_RED, DBGDRAW_RED };
   for( int32_t i = 0; i <= 1; ++i )
   {
-    dbgdraw_begin_cmd( dd_ctx, modes[i] );
+    dd_begin_cmd( dd_ctx, modes[i] );
     for( float x = -3 ; x <= 3; x += 0.5 )
     {
       for( float y = -3 ; y <= 3; y += 0.5 )
@@ -234,19 +242,19 @@ frame( app_state_t* state )
 
         /* Draw green spheres that passed culling, and report if a sphere was culled */
         dd_ctx->frustum_cull = 1;
-        dbgdraw_set_color( dd_ctx, pass_colors[i] );
-        int32_t status = dbgdraw_sphere( dd_ctx, o.data, radius );
+        dd_set_color( dd_ctx, pass_colors[i] );
+        int32_t status = dd_sphere( dd_ctx, o.data, radius );
 
         /* For culled spheres, disable culling and draw red sphere */
         if( status == DBGDRAW_ERR_CULLED )
         {
           dd_ctx->frustum_cull = 0;
-          dbgdraw_set_color( dd_ctx, cull_colors[i] );
-          dbgdraw_sphere( dd_ctx, o.data, radius );
+          dd_set_color( dd_ctx, cull_colors[i] );
+          dd_sphere( dd_ctx, o.data, radius );
         }
       }
     }
-    dbgdraw_end_cmd( dd_ctx );
+    dd_end_cmd( dd_ctx );
   }
 
   /* Switch matrices back to main camera */
@@ -254,16 +262,16 @@ frame( app_state_t* state )
   memcpy( dd_ctx->view.data, cam->view.data, sizeof(dd_ctx->view));
 
   /* Draw the view frustum */
-  dbgdraw_set_color( dd_ctx, DBGDRAW_WHITE );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-  dbgdraw_frustum( dd_ctx, view.data, proj.data );
-  dbgdraw_end_cmd( dd_ctx );
+  dd_set_color( dd_ctx, DBGDRAW_WHITE );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  dd_frustum( dd_ctx, view.data, proj.data );
+  dd_end_cmd( dd_ctx );
 
-  dbgdraw_set_color( dd_ctx, dbgdraw_rgbaf( 1.0f, 1.0f, 1.0f, 0.4f) );
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-  dbgdraw_frustum( dd_ctx, view.data, proj.data );
-  dbgdraw_end_cmd( dd_ctx );
+  dd_set_color( dd_ctx, dd_rgbaf( 1.0f, 1.0f, 1.0f, 0.4f) );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+  dd_frustum( dd_ctx, view.data, proj.data );
+  dd_end_cmd( dd_ctx );
 
-  dbgdraw_render( dd_ctx );
+  dd_render( dd_ctx );
 }
 

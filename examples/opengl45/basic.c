@@ -3,17 +3,17 @@
 
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
-#include "debugdraw.h"
+#include "dbgdraw.h"
 
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 #include "glad.h"
-#include "debugdraw_opengl45.h"
+#include "dbgdraw_opengl45.h"
 
 
 typedef struct {
   GLFWwindow* window;
-  dbgdraw_ctx_t* dd_ctx;
+  dd_ctx_t* dd_ctx;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -54,13 +54,13 @@ int32_t init( app_state_t* state ) {
     return 1;
   }
 
-  int32_t win_width = 640, win_height = 640;
+  int32_t win_width = 640, win_height = 320;
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, 4);
-  state->window = glfwCreateWindow( win_width, win_height, "dd_basic", NULL, NULL );
+  state->window = glfwCreateWindow( win_width, win_height, "dbgdraw_basic", NULL, NULL );
   if( !state->window )
   {
     fprintf( stderr, "[ERROR] Failed to create window\n" );
@@ -74,8 +74,13 @@ int32_t init( app_state_t* state ) {
     return 1;
   }
 
-  state->dd_ctx = calloc( 1, sizeof(dbgdraw_ctx_t) );
-  error = dbgdraw_init( state->dd_ctx, 1024 * 50, 2048 );
+  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc = { .max_vertices = 1024*50,
+                         .max_commands = 16,
+                         .detail_level = 2,
+                         .enable_frustum_cull = true,
+                         .enable_depth_test = true };
+  error = dd_init( state->dd_ctx, &desc );
   if( error )
   {
     fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
@@ -88,7 +93,7 @@ int32_t init( app_state_t* state ) {
 void frame(app_state_t* state) 
 {
   GLFWwindow* window    = state->window;
-  dbgdraw_ctx_t* dd_ctx = state->dd_ctx;
+  dd_ctx_t* dd_ctx = state->dd_ctx;
  
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
   glClearColor( 0.9f, 0.9f, 0.9f, 1.0f );
@@ -109,32 +114,37 @@ void frame(app_state_t* state)
   msh_mat4_t model = msh_mat4_identity();
   model = msh_post_rotate( model, angle, msh_vec3_posy() );
 
-  dbgdraw_new_frame( state->dd_ctx, view.data, proj.data, viewport.data, cam_pos.data, fovy, false );
+  dd_new_frame_info_t info = { .view_matrix       = view.data,
+                               .projection_matrix = proj.data,
+                               .viewport_size     = viewport.data,
+                               .vertical_fov      = fovy,
+                               .projection_type   = DBGDRAW_PERSPECTIVE };
+  dd_new_frame( dd_ctx, &info );
 
   msh_vec3_t x0 = msh_vec3_negx(); msh_vec3_t x1 = msh_vec3_posx();
   msh_vec3_t y0 = msh_vec3_negy(); msh_vec3_t y1 = msh_vec3_posy();
   msh_vec3_t z0 = msh_vec3_negz(); msh_vec3_t z1 = msh_vec3_posz();
 
-  dbgdraw_set_primitive_size( dd_ctx, 1.0f );
-  dbgdraw_set_transform( dd_ctx, model.data );
+  dd_set_primitive_size( dd_ctx, 1.0f );
+  dd_set_transform( dd_ctx, model.data );
 
-  dbgdraw_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-  dbgdraw_set_color( dd_ctx, DBGDRAW_RED );
-  dbgdraw_line( dd_ctx, x0.data, x1.data );
-  dbgdraw_set_color( dd_ctx, DBGDRAW_GREEN );
-  dbgdraw_line( dd_ctx, y0.data, y1.data );
-  dbgdraw_set_color( dd_ctx, DBGDRAW_BLUE );
-  dbgdraw_line( dd_ctx, z0.data, z1.data );
-  dbgdraw_set_color( dd_ctx, DBGDRAW_GRAY );
-  dbgdraw_aabb( dd_ctx, msh_vec3( -1.1, -1.1, -1.1 ).data, msh_vec3( 1.1, 1.1, 1.1 ).data );
-  dbgdraw_end_cmd( dd_ctx );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  dd_set_color( dd_ctx, DBGDRAW_RED );
+  dd_line( dd_ctx, x0.data, x1.data );
+  dd_set_color( dd_ctx, DBGDRAW_GREEN );
+  dd_line( dd_ctx, y0.data, y1.data );
+  dd_set_color( dd_ctx, DBGDRAW_BLUE );
+  dd_line( dd_ctx, z0.data, z1.data );
+  dd_set_color( dd_ctx, DBGDRAW_GRAY );
+  dd_aabb( dd_ctx, msh_vec3( -1.1, -1.1, -1.1 ).data, msh_vec3( 1.1, 1.1, 1.1 ).data );
+  dd_end_cmd( dd_ctx );
 
-  dbgdraw_render( dd_ctx );
+  dd_render( dd_ctx );
 }
 
 void cleanup( app_state_t* state )
 {
-  dbgdraw_term( state->dd_ctx );
+  dd_term( state->dd_ctx );
   glfwTerminate();
   free( state );
 }
