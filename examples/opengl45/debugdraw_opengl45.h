@@ -7,7 +7,6 @@
 typedef struct dbgdraw_render_backend {
   GLuint base_program;
   GLuint lines_program;
-  GLuint lines2_program;
   GLuint vao;
   GLuint vbo;
   GLuint font_tex_attrib_loc;
@@ -17,7 +16,7 @@ typedef struct dbgdraw_render_backend {
 } dbgdraw_render_backend_t;
 
 
-// TODO(maciej): Replace with proper debug.
+
 void dbgdraw__gl_check(const char* filename, uint32_t lineno)
 {
   uint32_t error = glGetError();
@@ -26,7 +25,6 @@ void dbgdraw__gl_check(const char* filename, uint32_t lineno)
   {
     printf("OGL Error %d at %s: %d\n", error, filename, lineno );
   }
-
 }
 
 #define GLCHECK(x) do{ x; dbgdraw__gl_check(__FILE__, __LINE__); } while(0)
@@ -101,8 +99,7 @@ dbgdraw__gl_link_program( GLuint vertex_shader, GLuint geometry_shader, GLuint f
 #define DBGDRAW_STRINGIFY(x) #x
 
 void init_base_shaders_source( const char** vert_shdr, const char** frag_shdr_src );
-void init_line_shaders_source( const char** vert_shdr_src, const char** geom_shdr_src, const char** frag_shdr_src );
-void init_line_shaders_source2( const char** vert_shdr_src, const char** frag_shdr_src );
+void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shdr_src );
 
 int32_t
 dbgdraw_backend_init( dbgdraw_ctx_t* ctx )
@@ -119,22 +116,12 @@ dbgdraw_backend_init( dbgdraw_ctx_t* ctx )
   ctx->backend->base_program  = dbgdraw__gl_link_program( vertex_shader, 0, fragment_shader );
 
   const char* line_vert_shdr_src = NULL;
-  const char* line_geom_shdr_src = NULL;
   const char* line_frag_shdr_src = NULL;
-  init_line_shaders_source( &line_vert_shdr_src, &line_geom_shdr_src, &line_frag_shdr_src );
+  init_line_shaders_source( &line_vert_shdr_src, &line_frag_shdr_src );
 
-  GLuint line_vertex_shader    = dbgdraw__gl_compile_shader_src( GL_VERTEX_SHADER, line_vert_shdr_src );
-  GLuint line_geometry_shader  = dbgdraw__gl_compile_shader_src( GL_GEOMETRY_SHADER, line_geom_shdr_src );
-  GLuint line_fragment_shader  = dbgdraw__gl_compile_shader_src( GL_FRAGMENT_SHADER, line_frag_shdr_src );
-  ctx->backend->lines_program  = dbgdraw__gl_link_program( line_vertex_shader, line_geometry_shader, line_fragment_shader );
-
-  const char* line2_vert_shdr_src = NULL;
-  const char* line2_frag_shdr_src = NULL;
-  init_line_shaders_source2( &line2_vert_shdr_src, &line2_frag_shdr_src );
-
-  GLuint vertex_shader2   = dbgdraw__gl_compile_shader_src( GL_VERTEX_SHADER, line2_vert_shdr_src );
-  GLuint fragment_shader2 = dbgdraw__gl_compile_shader_src( GL_FRAGMENT_SHADER, line2_frag_shdr_src );
-  ctx->backend->lines2_program  = dbgdraw__gl_link_program( vertex_shader2, 0, fragment_shader2 );
+  GLuint vertex_shader2   = dbgdraw__gl_compile_shader_src( GL_VERTEX_SHADER, line_vert_shdr_src );
+  GLuint fragment_shader2 = dbgdraw__gl_compile_shader_src( GL_FRAGMENT_SHADER, line_frag_shdr_src );
+  ctx->backend->lines_program  = dbgdraw__gl_link_program( vertex_shader2, 0, fragment_shader2 );
 
   GLCHECK( glCreateVertexArrays(1, &backend.vao ) );
 
@@ -177,7 +164,7 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
   GLCHECK( glNamedBufferSubData( ctx->backend->vbo, 0, ctx->verts_len * sizeof(dbgdraw_vertex_t), ctx->verts_data ) );
   
   // Setup required ogl state
-    // TODO(maciej): Rethink how commands are drawn --> sorting breaks 2d draws, since we do not do any depth testing
+  // TODO(maciej): Rethink how commands are drawn --> sorting breaks 2d draws, since we do not do any depth testing
   if( ctx->enable_depth_test ) { GLCHECK( glEnable( GL_DEPTH_TEST ) ); }
   GLCHECK( glEnable( GL_BLEND ) );
   GLCHECK( glEnable( GL_LINE_SMOOTH ) );
@@ -189,77 +176,6 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
   dd_vec2_t viewport_size = dd_vec2( ctx->viewport.data[2] - ctx->viewport.data[0], 
                                      ctx->viewport.data[3] - ctx->viewport.data[1] );
 
-#if 0
-  // Sort commands and find indices for switchting
-  dbgdraw_sort_commands( ctx );
-  int32_t cmd_base_idx[4] = {0};
-  int32_t cmd_count[4] = {0};
-  for( int i = 0; i < ctx->commands_len - 1; ++i )
-  {
-    dbgdraw_cmd_t *cmd_a = ctx->commands + i;
-    dbgdraw_cmd_t *cmd_b = ctx->commands + (i+1);
-    cmd_count[cmd_a->draw_mode]++;
-    if( cmd_a->draw_mode != cmd_b->draw_mode )
-    {
-      cmd_base_idx[cmd_b->draw_mode] = i+1;
-    }
-  }
-  cmd_count[ (ctx->commands + ctx->commands_len - 1)->draw_mode ]++;
-
-  // Draw filled triangles first
-  GLCHECK( glPolygonOffset( 2.0, 2.0 ) );
-  GLCHECK( glUseProgram( ctx->backend->base_program ) );
-  for( int32_t i = 0; i < cmd_count[DBGDRAW_MODE_FILL]; ++i )
-  {
-    int32_t cmd_idx = cmd_base_idx[DBGDRAW_MODE_FILL] + i;
-    dbgdraw_cmd_t *cmd = ctx->commands + cmd_idx;
-    dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
-  
-    GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, &mvp.data[0] ) );
-    GLCHECK( glDrawArrays( GL_TRIANGLES, cmd->base_index, cmd->vertex_count ) );
-  }
-
-  // Then draw lines
-  GLCHECK( glPolygonOffset( 1.0, 1.0 ) );
-  GLCHECK( glUseProgram( ctx->backend->lines_program ) );
-  for( int32_t i = 0; i < cmd_count[DBGDRAW_MODE_STROKE]; ++i )
-  {
-    int32_t cmd_idx = cmd_base_idx[DBGDRAW_MODE_STROKE] + i;
-    dbgdraw_cmd_t *cmd = ctx->commands + cmd_idx;
-    dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
-    GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, mvp.data ) );
-    GLCHECK( glUniform2fv( 1, 1, viewport_size.data ) );
-    GLCHECK( glUniform2fv( 2, 1, ctx->aa_radius.data ) );
-    GLCHECK( glDrawArrays( GL_LINES, cmd->base_index, cmd->vertex_count ) );
-  }
-  GLCHECK( glPolygonOffset( 0.0, 0.0 ) );
-  GLCHECK( glDisable( GL_POLYGON_OFFSET_FILL ) );
-
-  // Then draw points
-  GLCHECK( glUseProgram( ctx->backend->base_program ) );
-  for( int32_t i = 0; i < cmd_count[DBGDRAW_MODE_POINT]; ++i )
-  {
-    int32_t cmd_idx = cmd_base_idx[DBGDRAW_MODE_POINT] + i;
-    dbgdraw_cmd_t *cmd = ctx->commands + cmd_idx;
-    dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
-    GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, &mvp.data[0] ) );
-    GLCHECK( glDrawArrays( GL_POINTS, cmd->base_index, cmd->vertex_count ) );
-  }
-
-  // Finally, if enabled, draw text
-#if DBGDRAW_HAS_STB_TRUETYPE
-  glActiveTexture( GL_TEXTURE0 );
-  for( int32_t i = 0; i < cmd_count[DBGDRAW_MODE_TEXT]; ++i )
-  {
-    int32_t cmd_idx = cmd_base_idx[DBGDRAW_MODE_TEXT] + i;
-    dbgdraw_cmd_t *cmd = ctx->commands + cmd_idx;
-    dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
-    glBindTexture( GL_TEXTURE_2D, ctx->fonts[ cmd->font_idx ].tex_id ); 
-    GLCHECK( glDrawArrays( GL_TRIANGLES, cmd->base_index, cmd->vertex_count ) );
-  }
-#endif
-
-#else
   static GLenum gl_modes[4];
   gl_modes[DBGDRAW_MODE_FILL]   = GL_TRIANGLES;
   gl_modes[DBGDRAW_MODE_STROKE] = GL_LINES;
@@ -307,7 +223,7 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
 
       GLCHECK( glEnable( GL_POLYGON_OFFSET_FILL ) );
       GLCHECK( glPolygonOffset( 1.0, 1.0 ) );
-      GLCHECK( glUseProgram( ctx->backend->lines2_program ) );
+      GLCHECK( glUseProgram( ctx->backend->lines_program ) );
 
       GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, mvp.data ) );
       GLCHECK( glUniform2fv( 1, 1, viewport_size.data ) );
@@ -316,12 +232,10 @@ dbgdraw_backend_render( dbgdraw_ctx_t *ctx )
       GLCHECK( glUniform2i( 4, cmd->base_index, cmd->vertex_count ) );
       // For tex buffer lines vbo does not matter.
       GLCHECK( glDrawArrays( GL_TRIANGLES, 0, 3 * cmd->vertex_count ) );
-      // GLCHECK( glDrawArrays( gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count ) );
       GLCHECK( glPolygonOffset( 0.0, 0.0 ) );
       GLCHECK( glDisable( GL_POLYGON_OFFSET_FILL ) );
     }
   }
-#endif
 
   // Reset ogl state
   GLCHECK( glPolygonOffset( 0.0, 0.0 ) );
@@ -350,9 +264,6 @@ dbgdraw_backend_init_font_texture( dbgdraw_ctx_t* ctx, const uint8_t* data, int3
   GLCHECK( glTextureStorage2D( ctx->backend->font_tex_ids[ctx->fonts_len], 1, GL_R8, width, height ) );
   GLCHECK( glTextureSubImage2D( ctx->backend->font_tex_ids[ctx->fonts_len], 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, data ) );
   *tex_id = ctx->backend->font_tex_ids[ctx->fonts_len];
-
-  // ctx->backend->font_tex_handles[ctx->fonts_len] = glGetTextureHandleARB( ctx->backend->font_tex_ids[ctx->fonts_len] );
-  // GLCHECK( glMakeTextureHandleResidentARB(ctx->backend->font_tex_handles[ctx->fonts_len] ) ); // Remember to clean-up
   ctx->backend->font_tex_attrib_loc = glGetUniformLocation( ctx->backend->base_program, "tex" );
 
   return DBGDRAW_ERR_OK;
@@ -369,7 +280,6 @@ dbgdraw_backend_term( dbgdraw_ctx_t* ctx )
   #if DBGDRAW_HAS_STB_TRUETYPE
     for( int32_t i = 0; i < ctx->fonts_len; ++i )
     {
-      // glMakeTextureHandleNonResidentARB( ctx->backend->font_tex_handles[i] );
       glDeleteTextures( 1, &ctx->backend->font_tex_ids[i] );
     }
   #endif
@@ -417,133 +327,7 @@ void init_base_shaders_source( const char** vert_shdr_src, const char** frag_shd
   
 }
 
-void init_line_shaders_source( const char** vert_shdr_src, const char** geom_shdr_src, const char** frag_shdr_src )
-{
-  *vert_shdr_src = 
-    DBGDRAW_SHADER_HEADER
-    DBGDRAW_STRINGIFY(
-      layout(location = 0) uniform mat4 u_mvp;
-
-      layout(location = 0) in vec4 in_position_and_size;
-      layout(location = 1) in vec2 in_uv;
-      layout(location = 2) in vec4 in_color;
-
-      layout(location = 0) out vec4 v_color;
-      layout(location = 1) out noperspective float v_line_width;
-
-      void main()
-      {
-        v_color = in_color;
-        v_line_width = in_position_and_size.w;
-        gl_Position = u_mvp * vec4(in_position_and_size.xyz, 1.0);
-      }
-    );
-
-  *geom_shdr_src = 
-    DBGDRAW_SHADER_HEADER
-    DBGDRAW_STRINGIFY(
-      layout(lines) in;
-      layout(triangle_strip, max_vertices = 4) out;
-
-      layout(location = 1) uniform vec2 u_viewport_size;
-      layout(location = 2) uniform vec2 u_aa_radius;
-
-      layout(location = 0) in vec4 v_color[];
-      layout(location = 1) in noperspective float v_line_width[];
-
-      out vec4 g_color;
-      out noperspective float g_line_width;
-      out noperspective float g_line_length;
-      out noperspective float g_u;
-      out noperspective float g_v;
-
-      void main()
-      {
-        float u_width        = u_viewport_size[0];
-        float u_height       = u_viewport_size[1];
-        float u_aspect_ratio = u_height / u_width;
-
-        vec2 ndc_a = gl_in[0].gl_Position.xy / gl_in[0].gl_Position.w;
-        vec2 ndc_b = gl_in[1].gl_Position.xy / gl_in[1].gl_Position.w;
-
-        vec2 line_vector = ndc_b - ndc_a;
-        vec2 viewport_line_vector = line_vector * u_viewport_size;
-        vec2 dir = normalize(vec2( line_vector.x, line_vector.y * u_aspect_ratio ));
-
-        float line_width_a     = max( 1.0, v_line_width[0] ) + u_aa_radius[0];
-        float line_width_b     = max( 1.0, v_line_width[1] ) + u_aa_radius[0];
-        float extension_length = u_aa_radius[1];
-        float line_length      = length( viewport_line_vector ) + 2.0 * extension_length;
-        
-        vec2 normal    = vec2( -dir.y, dir.x );
-        vec2 normal_a  = vec2( line_width_a/u_width, line_width_a/u_height ) * normal;
-        vec2 normal_b  = vec2( line_width_b/u_width, line_width_b/u_height ) * normal;
-        vec2 extension = vec2( extension_length / u_width, extension_length / u_height ) * dir;
-
-        g_color = vec4( v_color[0].rgb, v_color[0].a * min( v_line_width[0], 1.0f ) );
-        g_u = line_width_a;
-        g_v = line_length * 0.5;
-        g_line_width = line_width_a;
-        g_line_length = line_length * 0.5;
-        gl_Position = vec4( (ndc_a + normal_a - extension) * gl_in[0].gl_Position.w, gl_in[0].gl_Position.zw );
-        EmitVertex();
-        
-        g_u = -line_width_a;
-        g_v = line_length * 0.5;
-        g_line_width = line_width_a;
-        g_line_length = line_length * 0.5;
-        gl_Position = vec4( (ndc_a - normal_a - extension) * gl_in[0].gl_Position.w, gl_in[0].gl_Position.zw );
-        EmitVertex();
-        
-        g_color = vec4( v_color[0].rgb, v_color[0].a * min( v_line_width[0], 1.0f ) );
-        g_u = line_width_b;
-        g_v = -line_length * 0.5;
-        g_line_width = line_width_b;
-        g_line_length = line_length * 0.5;
-        gl_Position = vec4( (ndc_b + normal_b + extension) * gl_in[1].gl_Position.w, gl_in[1].gl_Position.zw );
-        EmitVertex();
-        
-        g_u = -line_width_b;
-        g_v = -line_length * 0.5;
-        g_line_width = line_width_b;
-        g_line_length = line_length * 0.5;
-        gl_Position = vec4( (ndc_b - normal_b + extension) * gl_in[1].gl_Position.w, gl_in[1].gl_Position.zw );
-        EmitVertex();
-        
-        EndPrimitive();
-      }
-    );
-  
-  *frag_shdr_src = 
-    DBGDRAW_SHADER_HEADER
-    DBGDRAW_STRINGIFY(
-      layout(location = 2) uniform vec2 u_aa_radius;
-      
-      in vec4 g_color;
-      in noperspective float g_u;
-      in noperspective float g_v;
-      in noperspective float g_line_width;
-      in noperspective float g_line_length;
-
-      out vec4 frag_color;
-      void main()
-      {
-        /* We render a quad that is fattened by r, giving total width of the line to be w+r. We want smoothing to happen
-           around w, so that the edge is properly smoothed out. As such, in the smoothstep function we have:
-           Far edge   : 1.0                                          = (w+r) / (w+r)
-           Close edge : 1.0 - (2r / (w+r)) = (w+r)/(w+r) - 2r/(w+r)) = (w-r) / (w+r)
-           This way the smoothing is centered around 'w'.
-         */
-        float au = 1.0 - smoothstep( 1.0 - ((2.0*u_aa_radius[0]) / g_line_width),  1.0, abs(g_u / g_line_width) );
-        float av = 1.0 - smoothstep( 1.0 - ((2.0*u_aa_radius[1]) / g_line_length), 1.0, abs(g_v / g_line_length) );
-        frag_color = g_color;
-        frag_color.a *= min(av, au);
-      }
-    );
-}
-
-
-void init_line_shaders_source2( const char** vert_shdr_src, const char** frag_shdr_src )
+void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shdr_src )
 {
   *vert_shdr_src = 
     DBGDRAW_SHADER_HEADER

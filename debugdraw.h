@@ -74,9 +74,9 @@ extern "C" {
 #define DBGDRAW_TWO_PI      6.28318530717958647692528676655900576839433879875021164194988918462
 #define DBGDRAW_PI_OVER_TWO 1.57079632679489661923132169163975144209858469968755291048747229615
 
-#define dd_max(a, b) ( ((a) > (b)) ? (a) : (b) )
-#define dd_min(a, b) ( ((a) < (b)) ? (a) : (b) )
-#define dd_abs(x)    ( ((x) < 0 ) ? -(x) : (x) )
+#define DD_MAX(a, b) ( ((a) > (b)) ? (a) : (b) )
+#define DD_MIN(a, b) ( ((a) < (b)) ? (a) : (b) )
+#define DD_ABS(x)    ( ((x) < 0 ) ? -(x) : (x) )
 
 #ifndef DBGDRAW_NO_STDIO
 #include <stdio.h>
@@ -112,7 +112,8 @@ typedef enum dbgdraw_projection_type
   DBGDRAW_ORTHOGRAPHIC
 } dbgdraw_proj_type_t;
 
-typedef struct dbgdraw_context_desc_t dbgdraw_ctx_desc_t;
+typedef struct dbgdraw_context_desc dbgdraw_ctx_desc_t;
+typedef struct dbgdraw_new_frame_info dbgdraw_new_frame_info_t;
 typedef struct dbgdraw_context dbgdraw_ctx_t;
 typedef struct dbgdraw_text_info dbgdraw_text_info_t;
 
@@ -122,11 +123,13 @@ typedef struct dbgdraw_text_info dbgdraw_text_info_t;
 
 // Initialize / Terminate - call on init and shut down
 int32_t dbgdraw_init( dbgdraw_ctx_t *ctx, int32_t max_vertices, int32_t max_commands );
+int32_t dbgdraw_init_desc( dbgdraw_ctx_t *ctx, dbgdraw_ctx_desc_t* descs );
 int32_t dbgdraw_term( dbgdraw_ctx_t *ctx );
 
 // Start new frame (update all necessary data) / Render - call at the start and end of a frame
 int32_t dbgdraw_new_frame( dbgdraw_ctx_t *ctx, float* view_matrix, float* proj_matrix, float* viewport,
-                                               float* view_origin, float fovy, bool is_ortho );
+                                               float fovy, bool is_ortho );
+int32_t dbgdraw_new_frame_info( dbgdraw_ctx_t *ctx, dbgdraw_new_frame_info_t* info );
 int32_t dbgdraw_render( dbgdraw_ctx_t *ctx );
 
 // Command start and end + modify global state
@@ -330,15 +333,23 @@ typedef struct dbgdraw_render_backend dbgdraw_render_backend_t;
 
 typedef struct dbgdraw_context_desc
 {
-  dd_mat4_t view;
-  dd_mat4_t proj;
-  dd_vec4_t viewport;
-  dd_vec3_t view_origin;
-
-  float line_antialias_radius;
-  uint8_t projection_type;
+  int32_t max_vertices;
+  int32_t max_commands;
+  int32_t max_fonts;
+  int32_t detail_level;
+  float   line_antialias_radius;
+  uint8_t enable_frustun_cull;
   uint8_t enable_depth_test;
 } dbgdraw_ctx_desc_t;
+
+typedef struct dbgdraw_new_frame_info
+{
+  float*  view_matrix;
+  float*  projection_matrix;
+  float*  viewport_size;
+  float   vertical_fov;
+  uint8_t projection_type;
+} dbgdraw_new_frame_info_t;
 
 typedef struct dbgdraw_text_info
 {
@@ -506,6 +517,55 @@ dbgdraw_init( dbgdraw_ctx_t *ctx, int32_t max_vertices, int32_t max_commands )
   return DBGDRAW_ERR_OK;
 }
 
+
+int32_t
+dbgdraw_init_desc( dbgdraw_ctx_t *ctx, dbgdraw_ctx_desc_t* desc )
+{
+  DBGDRAW_ASSERT( ctx );
+  DBGDRAW_ASSERT( desc );
+
+  ctx->verts_len  = 0;
+  ctx->verts_cap  = DD_MAX( 1024, desc->max_vertices );
+  ctx->verts_data = DBGDRAW_MALLOC( ctx->verts_cap * sizeof(dbgdraw_vertex_t) );
+  if( !ctx->verts_data )
+  {
+    return DBGDRAW_ERR_OK;
+  }
+
+  ctx->commands_len = 0;
+  ctx->commands_cap = DD_MAX( 128, desc->max_commands );
+  ctx->commands     = DBGDRAW_MALLOC( ctx->commands_cap * sizeof(dbgdraw_cmd_t) );
+  if( !ctx->commands )
+  {
+    return DBGDRAW_ERR_OK;
+  }
+
+#if DBGDRAW_HAS_STB_TRUETYPE
+  ctx->fonts_len = 0;
+  ctx->fonts_cap = DD_MAX( 128, desc->max_fonts );
+  ctx->fonts     = DBGDRAW_MALLOC( ctx->fonts_cap * sizeof(dbgdraw_font_data_t) );
+  if( !ctx->fonts )
+  {
+    return DBGDRAW_ERR_OK;
+  }
+#endif
+
+  ctx->cur_cmd           = NULL;
+  ctx->color             = (dd_color_t){0, 0, 0, 255};
+  ctx->detail            = DD_MAX( desc->detail_level, 0);
+  ctx->xform             = dd_mat4_identity();
+  ctx->frustum_cull      = desc->enable_frustun_cull;
+  ctx->primitive_size    = 1.0f;
+  ctx->view              = dd_mat4_identity();
+  ctx->proj              = dd_mat4_identity();
+  ctx->aa_radius         = dd_vec2( desc->line_antialias_radius, 0.0f );
+  ctx->enable_depth_test = desc->enable_depth_test;
+
+  dbgdraw_backend_init( ctx );
+
+  return DBGDRAW_ERR_OK;
+}
+
 int32_t
 dbgdraw_term(dbgdraw_ctx_t *ctx)
 {
@@ -667,13 +727,12 @@ dbgdraw_render( dbgdraw_ctx_t *ctx )
 // TODO(maciej): Can we easily extract view_origin from view_matrix?
 int32_t
 dbgdraw_new_frame( dbgdraw_ctx_t *ctx, float* view_matrix, float* proj_matrix, float* viewport, 
-                                       float* view_origin, float fovy, bool is_ortho )
+                                       float fovy, bool is_ortho )
 {
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( view_matrix );
   DBGDRAW_ASSERT( proj_matrix );
   DBGDRAW_ASSERT( viewport );
-  DBGDRAW_ASSERT( view_origin );
 
   ctx->verts_len      = 0;
   ctx->commands_len   = 0;
@@ -682,13 +741,44 @@ dbgdraw_new_frame( dbgdraw_ctx_t *ctx, float* view_matrix, float* proj_matrix, f
 
   memcpy( ctx->view.data, view_matrix, sizeof(ctx->view) );
   memcpy( ctx->proj.data, proj_matrix, sizeof(ctx->proj) );
-  memcpy( ctx->view_origin.data, view_origin, sizeof( dd_vec3_t ) );
   memcpy( ctx->viewport.data, viewport, sizeof( dd_vec4_t ) );
   
+  dd_mat4_t inv_view_matrix = dd_mat4_se3_inverse( ctx->view );
+  memcpy( ctx->view_origin.data, inv_view_matrix.col[3].data, sizeof( dd_vec3_t ) );
+
   if( ctx->is_ortho ) { ctx->proj_scale_y = 2.0 / ctx->proj.data[5]; }
   else                { ctx->proj_scale_y = 2.0f * tan( fovy * 0.5f ); }
   
   dbgdraw_extract_frustum_planes(ctx);
+  
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dbgdraw_new_frame_info( dbgdraw_ctx_t *ctx, dbgdraw_new_frame_info_t* info )
+{
+  DBGDRAW_ASSERT( ctx );
+  DBGDRAW_ASSERT( info );
+  DBGDRAW_ASSERT( info->view_matrix );
+  DBGDRAW_ASSERT( info->projection_matrix );
+  DBGDRAW_ASSERT( info->viewport_size );
+
+  ctx->verts_len      = 0;
+  ctx->commands_len   = 0;
+  ctx->drawcall_count = 0;
+  ctx->is_ortho       = (info->projection_type == DBGDRAW_ORTHOGRAPHIC);
+
+  memcpy( ctx->view.data, info->view_matrix, sizeof( ctx->view ) );
+  memcpy( ctx->proj.data, info->projection_matrix, sizeof( ctx->proj ) );
+  memcpy( ctx->viewport.data, info->viewport_size, sizeof( dd_vec4_t ) );
+  
+  dd_mat4_t inv_view_matrix = dd_mat4_se3_inverse( ctx->view );
+  memcpy( ctx->view_origin.data, inv_view_matrix.col[3].data, sizeof( dd_vec3_t ) );
+
+  if( ctx->is_ortho ) { ctx->proj_scale_y = 2.0 / ctx->proj.data[5]; }
+  else                { ctx->proj_scale_y = 2.0f * tan( info->vertical_fov * 0.5f ); }
+  
+  dbgdraw_extract_frustum_planes( ctx );
   
   return DBGDRAW_ERR_OK;
 }
@@ -756,9 +846,9 @@ int dbgdraw__frustum_aabb_test(dbgdraw_ctx_t *ctx, dd_vec3_t min, dd_vec3_t max)
   for( int i = 0; i < 6; ++i )
   {
     const dd_vec4_t plane = ctx->frustum_planes[i];
-    float d = dd_max(min_pt.x * plane.x, max_pt.x * plane.x) +
-              dd_max(min_pt.y * plane.y, max_pt.y * plane.y) +
-              dd_max(min_pt.z * plane.z, max_pt.z * plane.z) +
+    float d = DD_MAX(min_pt.x * plane.x, max_pt.x * plane.x) +
+              DD_MAX(min_pt.y * plane.y, max_pt.y * plane.y) +
+              DD_MAX(min_pt.z * plane.z, max_pt.z * plane.z) +
               plane.w;
 
     if( d < 0.0f )
@@ -784,9 +874,9 @@ int dbgdraw__frustum_obb_test(dbgdraw_ctx_t *ctx, dd_vec3_t c, dd_mat3_t axes)
   {
     const dd_vec4_t plane = ctx->frustum_planes[i];
 
-    float pdotu = dd_abs( dd_vec4_dot(plane, xu) );
-    float pdotv = dd_abs( dd_vec4_dot(plane, xv) );
-    float pdotn = dd_abs( dd_vec4_dot(plane, xn) );
+    float pdotu = DD_ABS( dd_vec4_dot(plane, xu) );
+    float pdotv = DD_ABS( dd_vec4_dot(plane, xv) );
+    float pdotn = DD_ABS( dd_vec4_dot(plane, xn) );
 
     float effective_radius = (pdotu + pdotv + pdotn);
 
@@ -1029,7 +1119,7 @@ dbgdraw__box( dbgdraw_ctx_t* ctx, dd_vec3_t pts[8] )
 void
 dbgdraw__arc_point( dbgdraw_ctx_t *ctx, dd_vec3_t center, float radius, float theta, float resolution )
 {
-  resolution = dd_max( 4, resolution );
+  resolution = DD_MAX( 4, resolution );
   float d_theta = theta / resolution;
   int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
 
@@ -1413,7 +1503,7 @@ dbgdraw__torus_point_stroke( dbgdraw_ctx_t *ctx, dd_vec3_t center, float radius_
   /* create data for small circles, and get data boundaries */
   base_ptr = end_ptr;
   start_ptr = base_ptr;
-  int32_t res = dd_max( resolution >> 1, 4 );
+  int32_t res = DD_MAX( resolution >> 1, 4 );
   dbgdraw__arc( ctx, dd_vec3( 0, 0, 0 ), 1.0f, DBGDRAW_TWO_PI, res, 0 );
   end_ptr = ctx->verts_data + ctx->verts_len;
   len = end_ptr - start_ptr;
@@ -1455,7 +1545,7 @@ dbgdraw__torus_fill( dbgdraw_ctx_t *ctx, dd_vec3_t center, float radius_a, float
   (void) n_small_rings;
 
   int32_t res_a = resolution;
-  int32_t res_b = dd_max( 4, resolution >> 1 );
+  int32_t res_b = DD_MAX( 4, resolution >> 1 );
   float step_a = DBGDRAW_TWO_PI / (float)res_a;
   float step_b = DBGDRAW_TWO_PI / (float)res_b;
   float ax = radius_a;
@@ -2160,8 +2250,8 @@ dbgdraw_text( dbgdraw_ctx_t *ctx, float* pos, const char* str, dbgdraw_text_info
     p3 = dd_vec3_add( p, dd_mat3_vec3_mul( m, p3 ) );
     p4 = dd_vec3_add( p, dd_mat3_vec3_mul( m, p4 ) );
 
-    min_x = dd_min(p1.x, min_x);
-    max_x = dd_max(p3.x, max_x);
+    min_x = DD_MIN(p1.x, min_x);
+    max_x = DD_MAX(p3.x, max_x);
 
     dbgdraw__vertex_text( ctx, p1, dd_vec2( q.s0, q.t0 ) );
     dbgdraw__vertex_text( ctx, p2, dd_vec2( q.s1, q.t0 ) );
