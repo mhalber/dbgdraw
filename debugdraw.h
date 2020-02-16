@@ -1,40 +1,3 @@
-/* TODOs
- * [x] dbgdraw_arrow -> Include arrowhead size
- * [x] Make all c apis overrideable
- *   -> It still requires c runtime, but memory allocs and stdio are no longer baked in
- * [x] Error msgs
- * [x] Colors
- * [x] Make text optional
- * [x] Declutter the header
- * [x] Make it back into single header lib
- * [x] Investigate font_info issue
- * [x] Change public api to not use any vec type. Just basic data type
- * [x] Remove dependency on msh
- * [x] 'Remove' dependency on c headers.
- * [ ] Other examples
- *    [x] Lines demo
- *    [x] Bezier demo
- *    [ ] Vector field demo
- * [ ] Limit the number of copies in the internal api -- currently to many converts to dd_* - if conversion needs to happen it should happen at the end and we just pass around ptrs.
- * [ ] Resize containers when running out of space
- *    [ ] Consider flushing
- * [ ] Investigate validation layers
- *      -> Add a validation / error code to context
- *      -> If a flag is enabled, use the validation layer
- * [ ] OGL Backend:
- *    [x] Line Thickness as a geometry shader
- *    [x] Rendering lines - depth modification / they look worse than ogl ones?
- *    [x] Draw Call Groupig / Sorting
- *    [ ] Revisit depth in sorting
- * [ ] Bring back instancing
- * [ ] Default font
- *    [ ] Grab from nuklear - base 85 / adler32 decompress from stb.
- *    [ ] nuklear essentially took that from imgui
- * [ ] Change api prefix from dbgdraw to dd
- * [ ] Docs
- * [ ] Memory mapped buffers
- */
-
 #ifndef DBGDRAW_H
 #define DBGDRAW_H
 
@@ -127,7 +90,6 @@ extern "C" {
 // Forward declares and required structs / enums
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-//TODO(maciej): change to uint8_t*
 typedef struct dbgdraw_color
 {
   uint8_t r, g, b, a;
@@ -144,6 +106,13 @@ typedef enum dbgdraw_mode
   DBGDRAW_MODE_COUNT
 } dbgdraw_mode_t;
 
+typedef enum dbgdraw_projection_type
+{
+  DBGDRAW_PERSPECTIVE,
+  DBGDRAW_ORTHOGRAPHIC
+} dbgdraw_proj_type_t;
+
+typedef struct dbgdraw_context_desc_t dbgdraw_ctx_desc_t;
 typedef struct dbgdraw_context dbgdraw_ctx_t;
 typedef struct dbgdraw_text_info dbgdraw_text_info_t;
 
@@ -356,6 +325,21 @@ typedef enum dbgdraw_error
   DBGDRAW_ERR_COUNT
 } dbgdraw_err_code_t;
 
+
+typedef struct dbgdraw_render_backend dbgdraw_render_backend_t;
+
+typedef struct dbgdraw_context_desc
+{
+  dd_mat4_t view;
+  dd_mat4_t proj;
+  dd_vec4_t viewport;
+  dd_vec3_t view_origin;
+
+  float line_antialias_radius;
+  uint8_t projection_type;
+  uint8_t enable_depth_test;
+} dbgdraw_ctx_desc_t;
+
 typedef struct dbgdraw_text_info
 {
   dbgdraw_text_halign_t horz_align;
@@ -400,8 +384,6 @@ typedef struct dbgdraw_font_data
   uint32_t tex_id;
 } dbgdraw_font_data_t;
 #endif
-
-typedef struct dbgdraw_render_backend dbgdraw_render_backend_t;
 
 typedef struct dbgdraw_context
 {
@@ -457,12 +439,10 @@ typedef struct dbgdraw_context
 
 
 
-
 #ifdef DBGDRAW_IMPLEMENTATION
 
 #ifdef DBGDRAW_VALIDATION_LAYERS
 
-// ADD log function
 #define DBGDRAW_VALIDATE( cond, err_code ) do{                         \
 if( !(cond) )                                                        \
 {                                                                  \
@@ -520,6 +500,7 @@ dbgdraw_init( dbgdraw_ctx_t *ctx, int32_t max_vertices, int32_t max_commands )
   ctx->proj              = dd_mat4_identity();
   ctx->aa_radius         = dd_vec2( 0.0f, 0.0f );
   ctx->enable_depth_test = false; // NOTE(maciej): Issue here is that people might expect per-command behaviour
+
   dbgdraw_backend_init( ctx );
 
   return DBGDRAW_ERR_OK;
