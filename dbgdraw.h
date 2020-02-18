@@ -406,7 +406,7 @@ typedef struct dd_context
   /* User accessible state */
   dd_color_t color;
   dd_mat4_t xform;
-  uint8_t detail;
+  uint8_t detail_level;
   uint8_t frustum_cull;
   float primitive_size;
 
@@ -510,7 +510,7 @@ dd_init( dd_ctx_t *ctx, dd_ctx_desc_t* desc )
 
   ctx->cur_cmd           = NULL;
   ctx->color             = (dd_color_t){0, 0, 0, 255};
-  ctx->detail            = DD_MAX( desc->detail_level, 0 );
+  ctx->detail_level      = DD_MAX( desc->detail_level, 0 );
   ctx->xform             = dd_mat4_identity();
   ctx->frustum_cull      = desc->enable_frustum_cull;
   ctx->primitive_size    = 1.5f;
@@ -1645,7 +1645,7 @@ dd_circle(dd_ctx_t *ctx, float* c, float radius)
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( c );
 
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = resolution;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution;
@@ -1669,7 +1669,7 @@ dd_billboard_circle( dd_ctx_t *ctx, float* c, float radius )
     return DBGDRAW_ERR_NO_ACTIVE_CMD;
   }
 
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = resolution;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution;
@@ -1704,7 +1704,7 @@ dd_arc( dd_ctx_t *ctx, float* c, float radius, float theta )
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( c );
 
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = resolution+1;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution;
@@ -1867,7 +1867,7 @@ dd_sphere( dd_ctx_t *ctx, float* c, float radius )
     return DBGDRAW_ERR_CULLED;
   }
 
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t n_rings = 3;
 
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
@@ -1894,7 +1894,7 @@ dd_cone(dd_ctx_t *ctx, float* a, float* b, float radius)
 
   dd_vec3_t pt_a = dd_vec3(a[0], a[1], a[2] );
   dd_vec3_t pt_b = dd_vec3(b[0], b[1], b[2] );
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
 
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = resolution / 2 + 1;
@@ -1911,7 +1911,7 @@ dd_cone(dd_ctx_t *ctx, float* a, float* b, float radius)
 }
 
 int32_t
-dd_conical_frustum(dd_ctx_t *ctx, float* a, float* b, float radius_a, float radius_b )
+dd_conical_frustum( dd_ctx_t *ctx, float* a, float* b, float radius_a, float radius_b )
 {
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( a );
@@ -1919,7 +1919,7 @@ dd_conical_frustum(dd_ctx_t *ctx, float* a, float* b, float radius_a, float radi
 
   dd_vec3_t pt_a = dd_vec3(a[0], a[1], a[2] );
   dd_vec3_t pt_b = dd_vec3(b[0], b[1], b[2] );
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = resolution;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 5 * resolution;
@@ -1969,7 +1969,7 @@ dd_torus(dd_ctx_t *ctx, float* center, float radius_a, float radius_b )
     return DBGDRAW_ERR_CULLED;
   }
 
-  int32_t resolution = 1 << (ctx->detail + 2);
+  int32_t resolution = 1 << (ctx->detail_level + 2);
   int32_t n_big_rings = 4;
   int32_t n_small_rings = resolution >> 1;
   int32_t n_rings = n_big_rings + n_small_rings;
@@ -2006,8 +2006,8 @@ dd_torus(dd_ctx_t *ctx, float* center, float radius_a, float radius_b )
 // TODO(maciej): Font name
 int32_t
 dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf, 
-                               const char* name, int32_t font_size, int32_t width, int32_t height, 
-                               int32_t* font_idx )
+                          const char* name, int32_t font_size, int32_t width, int32_t height, 
+                          int32_t* font_idx )
 {
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( ttf_buf );

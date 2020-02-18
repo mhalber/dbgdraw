@@ -110,19 +110,19 @@ init( app_state_t* state )
   }
 
   int32_t win_width = 640, win_height = 320;
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_SAMPLES, 4);
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 4 );
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 5 );
+  glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
+  glfwWindowHint( GLFW_SAMPLES, 4 );
   state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
   if( !state->window )
   {
     fprintf( stderr, "[ERROR] Failed to create window\n" );
     return 1;
   }
-  glfwSetMouseButtonCallback( state->window, mouse_button_callback);
+  glfwSetMouseButtonCallback( state->window, mouse_button_callback );
   glfwSetScrollCallback( state->window, scroll_callback );
-  glfwSetKeyCallback( state->window, key_callback);
+  glfwSetKeyCallback( state->window, key_callback );
   glfwMakeContextCurrent( state->window );
   glfwSwapInterval(1);
 
