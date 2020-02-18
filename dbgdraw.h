@@ -168,7 +168,8 @@ int32_t dd_billboard_circle( dd_ctx_t *ctx, float* c, float radius );
 // Text rendering
 int32_t dd_find_font( dd_ctx_t* ctx, char* font_name );
 int32_t dd_set_font( dd_ctx_t *ctx, int32_t font_idx );
-int32_t dd_text( dd_ctx_t *ctx, float* pos, const char* str, dd_text_info_t* info );
+int32_t dd_text( dd_ctx_t *ctx, float* pos, char* str, dd_text_info_t* info );
+float   dd_get_text_width_font_space( dd_ctx_t* ctx, int32_t font_idx, char* str );
 int32_t dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf,
                                        const char* name, int32_t font_size, int32_t width, int32_t height, 
                                        int32_t* font_idx );
@@ -329,6 +330,7 @@ typedef enum dd_error
   DBGDRAW_ERR_CULLED,
   DBGDRAW_ERR_FONT_FILE_NOT_FOUND,
   DBGDRAW_ERR_FONT_LIMIT_REACHED,
+  DBGDRAW_ERR_OUT_OF_BOUNDS_ACCESS,
 
   DBGDRAW_ERR_COUNT
 } dd_err_code_t;
@@ -396,6 +398,7 @@ typedef struct dd_font_data
   float ascent, descent, line_gap;
 
   stbtt_packedchar char_data[256];
+  stbtt_fontinfo info;
   uint32_t size;
   uint32_t tex_id;
 } dd_font_data_t;
@@ -2026,12 +2029,11 @@ dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf,
   uint8_t* pixel_buf = DBGDRAW_MALLOC( width * height );
   memset( pixel_buf, 0, width * height );
 
-  stbtt_fontinfo info = {};
-  stbtt_InitFont(&info, ttf_buf, 0);
-  float to_pixel_scale = stbtt_ScaleForPixelHeight( &info, font->size);
+  stbtt_InitFont(&font->info, ttf_buf, 0);
+  float to_pixel_scale = stbtt_ScaleForPixelHeight( &font->info, font->size);
 
   int32_t ascent, descent, line_gap;
-  stbtt_GetFontVMetrics( &info, &ascent, &descent, &line_gap);
+  stbtt_GetFontVMetrics( &font->info, &ascent, &descent, &line_gap);
   font->ascent = to_pixel_scale * ascent;
   font->descent = to_pixel_scale * descent;
   font->line_gap = to_pixel_scale * line_gap;
@@ -2052,11 +2054,68 @@ dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf,
   return DBGDRAW_ERR_OK;
 }
 
+/* Functions below are incorrect, as they dont correctly decode utf-8, just a subset including latin and greek */
+char*
+dd__decode_char_incorrect( char* str, uint32_t* cp )
+{
+  uint8_t ch = (uint8_t)(*str);
+  if( ch < 128 ) { *cp = (uint32_t)*str++; }
+  else {
+    uint8_t a = (uint8_t)(*str++) & 0x1f;
+    uint8_t b = (uint8_t)(*str++) & 0x3f;
+    *cp = (a << 6) | b;
+  }
+  // 32 is first ascii char, 0x391 is the first greek char, and 95 is number of ASCII chars
+  int32_t shift = (*cp < 128) ? 32 : (0x391 - 95);
+  *cp -= shift;
+
+  return str;
+}
+
+int32_t
+dd__strlen_incorrect( const char* str )
+{
+  int32_t len = 0;
+  const char* str_cpy = str;
+  while(1)
+  {
+    if( *str_cpy=='\0' ) { break; }
+    // ASCII Char
+    if( (uint8_t)*str_cpy < 128 ) { str_cpy++; len++; }
+    // Other char, assuming 2 bytes
+    else { str_cpy+=2; len++; }
+  }
+  return len;
+}
+
+float
+dd_get_text_width_font_space( dd_ctx_t* ctx, int32_t font_idx, char* str )
+{
+  DBGDRAW_ASSERT( ctx );
+  DBGDRAW_ASSERT( str );
+  DBGDRAW_VALIDATE( font_idx < ctx->fonts_cap, DBGDRAW_ERR_OUT_OF_BOUNDS_ACCESS );
+
+  int32_t n_chars = dd__strlen_incorrect( str );
+  char* str_scan = str;
+  dd_font_data_t* font = ctx->fonts + font_idx;
+  float to_pixel_scale = stbtt_ScaleForPixelHeight( &font->info, font->size );
+  float width = 0;
+  for( int32_t i = 0; i < n_chars; ++i )
+  {
+    uint32_t cp;
+    str_scan = dd__decode_char_incorrect( str_scan, &cp );
+    int32_t advance, lsb;
+    stbtt_GetCodepointHMetrics( &font->info, cp, &advance, &lsb );
+    width += to_pixel_scale * (advance);
+  }
+  return width;
+}
+
 #ifndef DBGDRAW_NO_STDIO
 int32_t
 dd_init_font_from_file( dd_ctx_t* ctx, const char* font_path,
-                             int32_t font_size, int32_t width, int32_t height,
-                             int32_t* font_idx )
+                        int32_t font_size, int32_t width, int32_t height,
+                        int32_t* font_idx )
 {
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( font_path );
@@ -2103,29 +2162,13 @@ dd_set_font( dd_ctx_t *ctx, int32_t font_idx )
 }
 
 int32_t
-dd__strlen( const char* str )
-{
-  int32_t len = 0;
-  const char* str_cpy = str;
-  while(1)
-  {
-    if( *str_cpy=='\0' ) { break; }
-    // ASCII Char
-    if( (uint8_t)*str_cpy < 128 ) { str_cpy++; len++; }
-    // Other char, assuming 2 bytes
-    else { str_cpy+=2; len++; }
-  }
-  return len;
-}
-
-int32_t
-dd_text( dd_ctx_t *ctx, float* pos, const char* str, dd_text_info_t* info )
+dd_text( dd_ctx_t *ctx, float* pos, char* str, dd_text_info_t* info )
 {
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_ASSERT( pos );
 
   // NOTE(maciej): Only handles valid UTF-8 characters between cps U+0000 and U+07FF! It's awful!!
-  int32_t n_chars = dd__strlen( str );
+  int32_t n_chars = dd__strlen_incorrect( str );
 
   int32_t new_verts = 6 * n_chars;
   DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
@@ -2154,20 +2197,11 @@ dd_text( dd_ctx_t *ctx, float* pos, const char* str, dd_text_info_t* info )
 
   for( int32_t i = 0; i < n_chars; ++i )
   {
-    uint32_t cp = 0;
-    uint8_t ch = (uint8_t)(*str);
-    if( ch < 128 ) { cp = (uint32_t)*str++; }
-    else {
-      uint8_t a = (uint8_t)(*str++) & 0x1f;
-      uint8_t b = (uint8_t)(*str++) & 0x3f;
-      cp = (a << 6) | b;
-    }
-    // 32 is first ascii char, 0x391 is the first greek char, and 95 is number of ASCII chars
-    int32_t shift = (cp < 128) ? 32 : (0x391 - 95); 
+    uint32_t cp;
+    str = dd__decode_char_incorrect( str, &cp );
 
     stbtt_aligned_quad q;
-    stbtt_GetPackedQuad( font->char_data, font->bitmap_width, font->bitmap_height, cp - shift, &x, &y, &q, 0 );
-
+    stbtt_GetPackedQuad( font->char_data, font->bitmap_width, font->bitmap_height, cp, &x, &y, &q, 0 );
 
     dd_vec3_t p1 = dd_vec3( -scale*q.x0, -scale*q.y0, 0.0 );
     dd_vec3_t p2 = dd_vec3( -scale*q.x1, -scale*q.y0, 0.0 );
@@ -2318,6 +2352,9 @@ char* dd_error_message( int32_t error_code )
       break;
     case DBGDRAW_ERR_FONT_LIMIT_REACHED:
       return (char*)"[DBGDRAW ERROR] Out of font texture slots.";
+      break;
+    case DBGDRAW_ERR_OUT_OF_BOUNDS_ACCESS:
+      return (char*)"[DBGDRAW ERROR] Attmpting to access memory out of bounds.";
       break;
     default:
       return (char*)"[DBGDRAW ERROR] Unknown error";
