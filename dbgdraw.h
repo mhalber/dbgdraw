@@ -462,13 +462,13 @@ typedef struct dd_context
 
 #ifdef DBGDRAW_VALIDATION_LAYERS
 
-#define DBGDRAW_VALIDATE( cond, err_code ) do{                         \
-if( !(cond) )                                                        \
-{                                                                  \
-  DBGDRAW_LOG("vvvvvvvvvvvvvvvvvvvv  VALIDATION ERROR vvvvvvvvvvvvvvvv \n %s\n" \
-  "     Occured while calling function: %s\n", dd_error_message( err_code ), __func__ ); \
-  DBGDRAW_ASSERT( false );                                         \
-}\
+#define DBGDRAW_VALIDATE( cond, err_code ) do{                                            \
+if( !(cond) )                                                                             \
+{                                                                                         \
+  DBGDRAW_LOG("vvvvvvvvvvvvvvvvvvvv  VALIDATION ERROR vvvvvvvvvvvvvvvv \n %s\n"           \
+  "     Occured while calling function: %s\n", dd_error_message( err_code ), __func__ );  \
+  DBGDRAW_ASSERT( false );                                                                \
+}                                                                                         \
 } while(0)
 #else
 #define DBGDRAW_VALIDATE( cond, err ) \
