@@ -141,8 +141,9 @@ int32_t dd_render( dd_ctx_t *ctx );
 int32_t dd_begin_cmd( dd_ctx_t *ctx, dd_mode_t draw_mode );
 int32_t dd_end_cmd( dd_ctx_t *ctx );
 
-int32_t dd_set_color( dd_ctx_t *ctx, dd_color_t color );
 int32_t dd_set_transform( dd_ctx_t *ctx, float* xform );
+int32_t dd_set_color( dd_ctx_t *ctx, dd_color_t color );
+int32_t dd_set_detail_level( dd_ctx_t *ctx, uint32_t level );
 int32_t dd_set_primitive_size( dd_ctx_t *ctx, float primitive_size );
 
 // Primitive draw functions
@@ -586,13 +587,6 @@ dd_rgbau(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
   return (dd_color_t){r, g, b, a};
 }
 
-int32_t
-dd_set_color( dd_ctx_t *ctx, dd_color_t color )
-{
-  DBGDRAW_ASSERT( ctx );
-  ctx->color = color;
-  return DBGDRAW_ERR_OK;
-}
 
 int32_t
 dd_set_transform( dd_ctx_t *ctx, float* xform )
@@ -600,6 +594,22 @@ dd_set_transform( dd_ctx_t *ctx, float* xform )
   DBGDRAW_ASSERT( ctx );
   DBGDRAW_VALIDATE( ctx->cur_cmd == NULL, DBGDRAW_ERR_PREV_CMD_NOT_ENDED );
   memcpy( ctx->xform.data, xform, sizeof(ctx->xform) );
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_detail_level( dd_ctx_t *ctx, uint32_t level )
+{
+  DBGDRAW_ASSERT( ctx );
+  ctx->detail_level = level;
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_color( dd_ctx_t *ctx, dd_color_t color )
+{
+  DBGDRAW_ASSERT( ctx );
+  ctx->color = color;
   return DBGDRAW_ERR_OK;
 }
 
