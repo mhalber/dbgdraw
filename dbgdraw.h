@@ -150,6 +150,7 @@ int32_t dd_set_primitive_size( dd_ctx_t *ctx, float primitive_size );
 int32_t dd_point( dd_ctx_t *ctx, float* pt_a );
 int32_t dd_line( dd_ctx_t *ctx, float* pt_a, float* pt_b );
 int32_t dd_quad( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d );
+int32_t dd_rect( dd_ctx_t *ctx, float* pt_a, float* pt_b );
 int32_t dd_circle( dd_ctx_t *ctx, float* center_pt, float radius );
 int32_t dd_arc( dd_ctx_t *ctx, float* center_pt, float radius, float angle );
 
@@ -1613,6 +1614,34 @@ dd_quad( dd_ctx_t *ctx, float* a, float* b, float* c, float* d )
     dd_vec3( b[0], b[1], b[2] ),
     dd_vec3( c[0], c[1], c[2] ),
     dd_vec3( d[0], d[1], d[2] ),
+  };
+  dd__quad( ctx, arr );
+
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_rect( dd_ctx_t *ctx, float* a, float* b )
+{
+  DBGDRAW_ASSERT( ctx );
+  DBGDRAW_ASSERT( a );
+  DBGDRAW_ASSERT( b );
+
+  int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
+  mode_vert_count[DBGDRAW_MODE_POINT]  = 4;
+  mode_vert_count[DBGDRAW_MODE_STROKE] = 8;
+  mode_vert_count[DBGDRAW_MODE_FILL]   = 6;
+  int32_t new_verts = mode_vert_count[ctx->cur_cmd->draw_mode];
+  DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
+  DBGDRAW_VALIDATE( ctx->verts_len + new_verts < ctx->verts_cap, DBGDRAW_ERR_OUT_OF_VERTEX_BUFFER );
+
+  // TODO(maciej): Just pass for float pointers to dd__quad
+  dd_vec3_t arr[4] =
+  {
+    dd_vec3( a[0], a[1], a[2] ),
+    dd_vec3( a[0], b[1], a[2] ),
+    dd_vec3( b[0], b[1], b[2] ),
+    dd_vec3( b[0], a[1], b[2] ),
   };
   dd__quad( ctx, arr );
 
