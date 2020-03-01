@@ -190,6 +190,7 @@ dd_color_t dd_rgbf( float r, float g, float b );
 dd_color_t dd_rgbaf( float r, float g, float b, float a);
 dd_color_t dd_rgbu( uint8_t r, uint8_t g, uint8_t b );
 dd_color_t dd_rgbau( uint8_t r, uint8_t g, uint8_t b, uint8_t a );
+dd_color_t dd_interpolate_color( dd_color_t c0, dd_color_t c1, float t );
 
 // User provides implementation for these - see examples for implementations of these
 int32_t dd_backend_init( dd_ctx_t* ctx );
@@ -588,6 +589,16 @@ dd_rgbau(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
   return (dd_color_t){r, g, b, a};
 }
 
+dd_color_t
+dd_interpolate_color( dd_color_t c0, dd_color_t c1, float t )
+{
+  dd_color_t retcol;
+  retcol.r = (uint8_t)((1.0 - t) * (float)c0.r + t * (float)c1.r);
+  retcol.g = (uint8_t)((1.0 - t) * (float)c0.g + t * (float)c1.g);
+  retcol.b = (uint8_t)((1.0 - t) * (float)c0.b + t * (float)c1.b);
+  retcol.a = (uint8_t)((1.0 - t) * (float)c0.a + t * (float)c1.a);
+  return retcol;
+}
 
 int32_t
 dd_set_transform( dd_ctx_t *ctx, float* xform )
@@ -843,7 +854,7 @@ dd__pixels_to_world_size( dd_ctx_t* ctx, dd_vec3_t pos, float pixels )
 
   dd_vec3_t v = dd_vec3_sub( pos, ctx->view_origin);
   float dist = ctx->is_ortho ? 1.0 : dd_vec3_norm( v );
-  float viewport_height = ctx->viewport.w - ctx->viewport.y;
+  float viewport_height = ctx->viewport.w;
   float projected_size = ctx->proj_scale_y * (pixels / viewport_height);
   return dist * projected_size;
 
@@ -927,9 +938,9 @@ dd__generate_cone_orientation( dd_vec3_t q0, dd_vec3_t q1 )
 void
 dd__vertex( dd_ctx_t *ctx, dd_vec3_t pt )
 {
-  ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){.pos_size = dd_vec4( pt.x, pt.y, pt.z, ctx->primitive_size),
-                                                         .uv = (dd_vec2_t){{0.0f, 0.0f}},
-                                                         .col = ctx->color};
+  ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = dd_vec4( pt.x, pt.y, pt.z, ctx->primitive_size),
+                                                     .uv = (dd_vec2_t){{0.0f, 0.0f}},
+                                                     .col = ctx->color};
   ctx->cur_cmd->vertex_count++;
 }
 
@@ -938,9 +949,9 @@ dd__vertex_text( dd_ctx_t *ctx, dd_vec3_t pt, dd_vec2_t uv )
 {
   dd_color_t c = ctx->color;
   c.a = 0;
-  ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){.pos_size = dd_vec4( pt.x, pt.y, pt.z, ctx->primitive_size ),
-                                                         .uv = uv,
-                                                         .col = c};
+  ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = dd_vec4( pt.x, pt.y, pt.z, ctx->primitive_size ),
+                                                     .uv = uv,
+                                                     .col = c};
   ctx->cur_cmd->vertex_count++;
 }
 
@@ -1597,7 +1608,6 @@ dd_quad( dd_ctx_t *ctx, float* a, float* b, float* c, float* d )
   DBGDRAW_ASSERT( b );
   DBGDRAW_ASSERT( c );
   DBGDRAW_ASSERT( d );
-
 
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT]  = 4;

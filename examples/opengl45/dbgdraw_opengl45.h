@@ -173,8 +173,7 @@ dd_backend_render( dd_ctx_t *ctx )
   GLCHECK( glBindVertexArray( ctx->backend->vao ) );
   GLCHECK( glEnable( GL_POLYGON_OFFSET_FILL ) );
 
-  dd_vec2_t viewport_size = dd_vec2( ctx->viewport.data[2] - ctx->viewport.data[0], 
-                                     ctx->viewport.data[3] - ctx->viewport.data[1] );
+  dd_vec2_t viewport_size = dd_vec2( ctx->viewport.data[2], ctx->viewport.data[3] );
 
   static GLenum gl_modes[4];
   gl_modes[DBGDRAW_MODE_FILL]   = GL_TRIANGLES;
