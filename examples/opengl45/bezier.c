@@ -4,6 +4,7 @@ static const char *PROGRAM_NAME = "dbgdraw_bezier";
 #define MSH_STD_IMPLEMENTATION
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
+#define DBGDRAW_VALIDATION_LAYERS
 
 #include "msh_std.h"
 #include "msh_vec_math.h"
@@ -116,7 +117,7 @@ void
 draw_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, 
              dd_color_t pt_fill_color, dd_color_t pt_stroke_color, float radius )
 {
-  dd_ctx->detail = 3;
+  dd_ctx->detail_level = 3;
   
   dd_set_color( dd_ctx, pt_fill_color );
   dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
@@ -135,7 +136,7 @@ draw_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts,
   }
   dd_end_cmd( dd_ctx );
   
-  dd_ctx->detail = 2;
+  dd_ctx->detail_level = 2;
 }
 
 // Based on  https://blog.demofox.org/2015/07/05/the-de-casteljeau-algorithm-for-evaluating-bezier-curves/
@@ -204,7 +205,7 @@ draw_labeled_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_
   float offset_y = -(25.0f + radius);
   dd_set_color( dd_ctx, text_color );
   dd_set_font( dd_ctx, CMU_FONT );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   char buf[128] = {0};
   for( int32_t i = 0; i < n_pts ; ++i )
   {
@@ -217,7 +218,7 @@ draw_labeled_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_
   offset_x = 15.0f + radius;
   offset_y = -(30.0f + radius );
   dd_set_font( dd_ctx, CMU_FONT_SMALL );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   for( int32_t i = 0; i < n_pts ; ++i )
   {
     char* underscore = strchr( pts_labels[i], '_' );

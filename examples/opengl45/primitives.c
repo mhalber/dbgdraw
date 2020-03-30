@@ -5,6 +5,7 @@ static const char *PROGRAM_NAME = "dbgdraw_primitives.c";
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define MSH_CAMERA_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
+#define DBGDRAW_VALIDATION_LAYERS
 
 #include "msh_std.h"
 #include "msh_vec_math.h"
@@ -124,7 +125,7 @@ init( app_state_t* state )
   glfwSetScrollCallback( state->window, scroll_callback );
   glfwSetKeyCallback( state->window, key_callback );
   glfwMakeContextCurrent( state->window );
-  glfwSwapInterval(1);
+  glfwSwapInterval(0);
 
   if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
   {
@@ -133,7 +134,7 @@ init( app_state_t* state )
   }
 
   state->primitives = calloc( 1, sizeof(dd_ctx_t) );
-  dd_ctx_desc_t desc_primitives = { .max_vertices = 1024*50,
+  dd_ctx_desc_t desc_primitives = { .max_vertices = 64,
                                     .max_commands = 16,
                                     .detail_level = 2,
                                     .enable_frustum_cull = true,
@@ -146,7 +147,7 @@ init( app_state_t* state )
   }
 
   state->overlay = calloc( 1, sizeof(dd_ctx_t) );
-  dd_ctx_desc_t desc_overlay = { .max_vertices = 1024*50,
+  dd_ctx_desc_t desc_overlay = { .max_vertices = 64,
                                  .max_commands = 16,
                                  .enable_frustum_cull = false,
                                  .enable_depth_test = false };
@@ -158,7 +159,7 @@ init( app_state_t* state )
   }
 
   error = dd_init_font_from_file( state->overlay, "examples/fonts/ProggySquare.ttf", 11, 512, 512, 
-                                                                                          &state->proggy_square_font );
+                                                                                     &state->proggy_square_font );
   if( error )
   {
     fprintf( stderr, "[ERROR] Failed to read font\n" );
@@ -232,7 +233,7 @@ frame( app_state_t* state )
     glViewport( cam->viewport.x, cam->viewport.y, cam->viewport.z, cam->viewport.w );
   }
 
-  static int32_t show_lines   = 1;
+  static int32_t show_lines   = 0;
   static int32_t show_solid   = 1;
   static int32_t show_points  = 0;
   static int32_t show_overlay = 1;
@@ -255,7 +256,7 @@ frame( app_state_t* state )
   dd_new_frame( primitives, &info );
 
   primitives->enable_depth_test = true;
-  primitives->detail = detail_lvl;
+  primitives->detail_level = detail_lvl;
 
 #define N_TIMES 100
   static float times[N_TIMES] = {};
@@ -271,6 +272,7 @@ frame( app_state_t* state )
   dt1 = msh_time_now();
 
   dd_color_t* color = NULL;
+    dd_set_shading_type( primitives, DBGDRAW_SHADING_SOLID );
   for( int32_t draw_mode = DBGDRAW_MODE_FILL; draw_mode < DBGDRAW_MODE_COUNT; ++draw_mode )
   {
     switch( draw_mode )
@@ -288,9 +290,6 @@ frame( app_state_t* state )
       case DBGDRAW_MODE_FILL:
         if( !show_solid ) { continue; }
         color = colors;
-        break;
-      case DBGDRAW_MODE_TEXT:
-        continue;
         break;
     }
 
@@ -318,10 +317,10 @@ frame( app_state_t* state )
 
     cur_loc = msh_vec3( 3, 0, 0 );
     dd_set_color( primitives, *color );
-    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0, -0.5)).data,
-                         msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0, -0.5)).data,
-                         msh_vec3_add(cur_loc, msh_vec3( 0.5, 0.0,  0.5)).data,
-                         msh_vec3_add(cur_loc, msh_vec3(-0.5, 0.0,  0.5)).data );
+    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(  -0.5,  -0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  -0.5,  0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5, 0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5, -0.5, 0.0 ) ).data );
     color++;
 
     cur_loc = msh_vec3( -3, 0, -2 );
@@ -345,7 +344,6 @@ frame( app_state_t* state )
     cur_loc = msh_vec3( -3, 0, 2 );
     dd_set_color( primitives, *color );
     dd_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
-
 
     cur_loc = msh_vec3( -1, 0, 2 );
     dd_set_color( primitives, *color );

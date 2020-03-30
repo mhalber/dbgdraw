@@ -13,6 +13,7 @@ typedef struct dd_render_backend {
   GLuint font_tex_ids[16];
 
   GLuint line_data_texture_id;
+  size_t vbo_size;
 } dd_render_backend_t;
 
 
@@ -24,9 +25,11 @@ void dd__gl_check(const char* filename, uint32_t lineno)
   if( error != GL_NO_ERROR )
   {
     printf("OGL Error %d at %s: %d\n", error, filename, lineno );
+    exit(-1);
   }
 }
 
+// #define GLCHECK(x) x
 #define GLCHECK(x) do{ x; dd__gl_check(__FILE__, __LINE__); } while(0)
 
 int8_t
@@ -104,7 +107,7 @@ void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shd
 int32_t
 dd_backend_init( dd_ctx_t* ctx )
 {
-  static dd_render_backend_t backend = {0};
+  static dd_render_backend_t backend = {};
   ctx->backend = &backend;
 
   const char* base_vert_shdr_src = NULL;
@@ -126,41 +129,48 @@ dd_backend_init( dd_ctx_t* ctx )
   GLCHECK( glCreateVertexArrays(1, &backend.vao ) );
 
   GLCHECK( glCreateBuffers( 1, &backend.vbo ) );
-  GLCHECK( glNamedBufferStorage( backend.vbo, ctx->verts_cap * sizeof(dd_vertex_t), NULL, GL_DYNAMIC_STORAGE_BIT ) );
+
+  backend.vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
+  GLCHECK( glNamedBufferData( backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW ) );
+
 
   GLCHECK( glCreateTextures( GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id ) );
   GLCHECK( glTextureBuffer( backend.line_data_texture_id, GL_RGBA32F, backend.vbo ) );
 
   GLuint bind_idx = 0;
-  GLuint pos_size_loc = glGetAttribLocation( backend.base_program, "in_position_and_size" );
-  GLuint uv_loc       = glGetAttribLocation( backend.base_program, "in_uv" );
-
-  GLuint color_loc    = glGetAttribLocation( backend.base_program, "in_color" );
+  GLuint pos_size_loc     = glGetAttribLocation( backend.base_program, "in_position_and_size" );
+  GLuint uv_or_normal_loc = glGetAttribLocation( backend.base_program, "in_uv_or_normal" );
+  GLuint color_loc        = glGetAttribLocation( backend.base_program, "in_color" );
 
   GLCHECK( glVertexArrayVertexBuffer( backend.vao, bind_idx, backend.vbo, 0, sizeof(dd_vertex_t) ) );
 
   GLCHECK( glEnableVertexArrayAttrib( backend.vao, pos_size_loc ) );
-  GLCHECK( glEnableVertexArrayAttrib( backend.vao, uv_loc ) );
+  GLCHECK( glEnableVertexArrayAttrib( backend.vao, uv_or_normal_loc ) );
   GLCHECK( glEnableVertexArrayAttrib( backend.vao, color_loc ) );
 
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, pos_size_loc, 4, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, pos_size) ) );
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, uv_loc,       2, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, uv) ) );
-  GLCHECK( glVertexArrayAttribFormat( backend.vao, color_loc,    4, GL_UNSIGNED_BYTE, GL_TRUE,  offsetof(dd_vertex_t, col) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, pos_size_loc,     4, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, pos_size) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, uv_or_normal_loc, 3, GL_FLOAT,         GL_FALSE, offsetof(dd_vertex_t, uv) ) );
+  GLCHECK( glVertexArrayAttribFormat( backend.vao, color_loc,        4, GL_UNSIGNED_BYTE, GL_TRUE,  offsetof(dd_vertex_t, col) ) );
 
   GLCHECK( glVertexArrayAttribBinding( backend.vao, pos_size_loc, bind_idx ) );
-  GLCHECK( glVertexArrayAttribBinding( backend.vao, uv_loc, bind_idx ) );
+  GLCHECK( glVertexArrayAttribBinding( backend.vao, uv_or_normal_loc, bind_idx ) );
   GLCHECK( glVertexArrayAttribBinding( backend.vao, color_loc, bind_idx ) );
 
   return DBGDRAW_ERR_OK;
 }
 
-// Break this into update and render functions!
+
 int32_t 
 dd_backend_render( dd_ctx_t *ctx )
 {
   if( !ctx->commands_len ) { return DBGDRAW_ERR_OK; }
 
-  // Update the data --> May be unnecessary with persistently mapped buffers
+  // Update the data --> May be unnecessary with persistently mapped buffers?
+  if( ctx->backend->vbo_size < ctx->verts_cap * sizeof(dd_vertex_t) )
+  {
+    ctx->backend->vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
+    GLCHECK( glNamedBufferData( ctx->backend->vbo, ctx->backend->vbo_size, NULL, GL_DYNAMIC_DRAW ) );
+  }
   GLCHECK( glNamedBufferSubData( ctx->backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data ) );
   
   // Setup required ogl state
@@ -175,23 +185,23 @@ dd_backend_render( dd_ctx_t *ctx )
 
   dd_vec2_t viewport_size = dd_vec2( ctx->viewport.data[2], ctx->viewport.data[3] );
 
-  static GLenum gl_modes[4];
+  static GLenum gl_modes[3];
   gl_modes[DBGDRAW_MODE_FILL]   = GL_TRIANGLES;
   gl_modes[DBGDRAW_MODE_STROKE] = GL_LINES;
   gl_modes[DBGDRAW_MODE_POINT]  = GL_POINTS;
-  gl_modes[DBGDRAW_MODE_TEXT]   = GL_TRIANGLES;
 
   for( int32_t i = 0; i < ctx->commands_len; ++i )
   {
     dd_cmd_t *cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
 
-    if( cmd->draw_mode == DBGDRAW_MODE_FILL || cmd->draw_mode == DBGDRAW_MODE_TEXT )
+    if( cmd->draw_mode == DBGDRAW_MODE_FILL )
     {
       GLCHECK( glEnable( GL_POLYGON_OFFSET_FILL ) );
       GLCHECK( glPolygonOffset( 2.0, 2.0 ) );
       GLCHECK( glUseProgram( ctx->backend->base_program ) );
       GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, &mvp.data[0] ) );
+      GLCHECK( glUniform1i( 1, cmd->shading_type ) );
 #if DBGDRAW_HAS_STB_TRUETYPE
       if( cmd->font_idx >= 0 )
       {
@@ -210,6 +220,7 @@ dd_backend_render( dd_ctx_t *ctx )
     {
       GLCHECK( glUseProgram( ctx->backend->base_program ) );
       GLCHECK( glUniformMatrix4fv( 0, 1, GL_FALSE, &mvp.data[0] ) );
+      GLCHECK( glUniform1i( 1, 0 ) );
 
       GLCHECK( glDrawArrays( gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count ) );
     }
@@ -291,19 +302,28 @@ void init_base_shaders_source( const char** vert_shdr_src, const char** frag_shd
   *vert_shdr_src = 
     DBGDRAW_SHADER_HEADER
     DBGDRAW_STRINGIFY(
-      out gl_PerVertex { vec4 gl_Position;  float gl_PointSize; float gl_ClipDistance[]; };
       layout(location = 0) uniform mat4 u_mvp;
+      layout(location = 1) uniform int shading_type;
 
       layout(location = 0) in vec4 in_position_and_size;
-      layout(location = 1) in vec2 in_uv;
+      layout(location = 1) in vec3 in_uv_or_normal;
       layout(location = 2) in vec4 in_color;
 
       layout(location = 0) out vec4 v_color;
-      layout(location = 1) out vec2 v_uv;
+      layout(location = 1) out vec3 v_uv_or_normal;
+      layout(location = 2) out flat int v_shading_type;
       
       void main() {
         v_color = in_color;
-        v_uv = in_uv;
+        if( shading_type == 0 )
+        {
+          v_uv_or_normal = in_uv_or_normal;
+        }
+        else
+        {
+          v_uv_or_normal = vec3( u_mvp * vec4( in_uv_or_normal, 0.0 ) );
+        }
+        v_shading_type = shading_type;
         gl_Position = u_mvp * vec4( in_position_and_size.xyz, 1.0 );
         gl_PointSize = in_position_and_size.w;
       }
@@ -315,12 +335,22 @@ void init_base_shaders_source( const char** vert_shdr_src, const char** frag_shd
       uniform sampler2D tex;
 
       layout(location = 0) in vec4 v_color;
-      layout(location = 1) in vec2 v_uv; 
+      layout(location = 1) in vec3 v_uv_or_normal; 
+      layout(location = 2) in flat int v_shading_type;
 
       layout(location = 0) out vec4 frag_color;
 
       void main() {
-        frag_color = vec4(v_color.rgb, min( 1.0, v_color.a + texture(tex, v_uv).r) );
+        if( v_shading_type == 0 )
+        {
+          frag_color = vec4(v_color.rgb, min( 1.0, v_color.a + texture(tex, vec2(v_uv_or_normal) ).r) );
+        }
+        else
+        {
+          vec3 light_dir = vec3( 0, 0, 1 );
+          float ndotl = dot( v_uv_or_normal, light_dir );
+          frag_color = vec4( v_color.rgb * ndotl, v_color.a );
+        }
       }
     );
   
@@ -352,7 +382,7 @@ void init_line_shaders_source( const char** vert_shdr_src, const char** frag_shd
       vec4 get_vertex_color( int idx, samplerBuffer sampler )
       {
         vec4 tex_sample = texelFetch( sampler, idx );
-        uint packed_color = floatBitsToUint( tex_sample.z );
+        uint packed_color = floatBitsToUint( tex_sample.w );
         vec4 color = vec4( float( (packed_color)       & uint(0x000000FF)),
                            float( (packed_color >> 8)  & uint(0x000000FF)),
                            float( (packed_color >> 16) & uint(0x000000FF)),

@@ -7,9 +7,9 @@ OUT_DIR = out/
 EXT_DIR = external/
 BACKEND_NAME = opengl45/
 
-DD_PRIM_EXE = dd_text
-DD_PRIM_SRCS = dbgdraw.c examples/$(BACKEND_NAME)text.c 
-DD_PRIM_OBJS = $(OUT_DIR)dbgdraw.o $(OUT_DIR)text.o $(OUT_DIR)glad.o
+DD_PRIM_EXE = dd_primitives
+DD_PRIM_SRCS = dbgdraw.c examples/$(BACKEND_NAME)primitives.c 
+DD_PRIM_OBJS = $(OUT_DIR)dbgdraw.o $(OUT_DIR)primitives.o $(OUT_DIR)glad.o
 
 # Compile and link options
 CC = gcc
@@ -21,9 +21,9 @@ CFLAGS = $(WARNINGS) $(REL_FLAGS) -std=c99 -I. -I../ -I${EXT_DIR} -Iexamples/$(B
 LIBS = -lopengl32 -lgdi32 -lglfw3
 
 # Make targets
-all: clean dd_text
+all: clean dd_primitives
 
-dd_text: $(DD_PRIM_OBJS)
+dd_primitives: $(DD_PRIM_OBJS)
 		$(CC) $(CFLAGS) $(DD_PRIM_OBJS) $(LIBS) -o ${BIN_DIR}${DD_PRIM_EXE}
 
 clean:

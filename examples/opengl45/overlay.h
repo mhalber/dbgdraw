@@ -4,7 +4,7 @@ draw_legend( dd_ctx_t* ctx, char* legend_string, int32_t x, int32_t y )
   float px = x;
   float py = y+0.5;
   int32_t error = DBGDRAW_ERR_OK;
-  error = dd_begin_cmd( ctx, DBGDRAW_MODE_TEXT );
+  error = dd_begin_cmd( ctx, DBGDRAW_MODE_FILL );
   if( error ) { return error; }
   dd_text_info_t info = { .vert_align = DBGDRAW_TEXT_TOP };
   char* start, *end;
@@ -80,7 +80,7 @@ draw_frame_timer( dd_ctx_t* ctx, int32_t x, int32_t y,
   
   char dd_time_buf[128];
   snprintf(dd_time_buf, 128, "Frame Time %4.3fms (%5.1f FPS)", dd_time, 1000.0 / dd_time );
-  dd_begin_cmd( ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( ctx, DBGDRAW_MODE_FILL );
   dd_text_info_t alignment = { .vert_align = DBGDRAW_TEXT_TOP, .horz_align = DBGDRAW_TEXT_RIGHT };
   dd_set_color( ctx, dd_rgbf( 0.1f, 0.1f, 0.3f ) );
   dd_text( ctx, msh_vec3( max_x-5.5f, min_y-5.5f, 0.0).data, dd_time_buf, &alignment );

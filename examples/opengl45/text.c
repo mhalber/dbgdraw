@@ -3,6 +3,7 @@ static const char *PROGRAM_NAME = "debugdraw_text";
 #define MSH_VEC_MATH_INCLUDE_LIBC_HEADERS
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
+#define DBGDRAW_VALIDATION_LAYERS 
 
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
@@ -80,6 +81,7 @@ init( app_state_t* state ) {
     fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
     return 1;
   }
+  CMU_FONT=-1;
 
   state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
   dd_ctx_desc_t desc = { .max_vertices = 1024*50,
@@ -124,32 +126,20 @@ void frame(app_state_t* state)
   int32_t base_y = h/2;
   dd_set_font(dd_ctx, CMU_FONT );
   dd_set_color( dd_ctx, DBGDRAW_LIGHT_LIME );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   dd_text( dd_ctx, msh_vec3( base_x + 10, base_y - 42, 0).data, "The quick brown fox jumps over the lazy dog", NULL );
   dd_end_cmd( dd_ctx );
 
   dd_set_color( dd_ctx, DBGDRAW_LIGHT_CYAN );
   dd_text_info_t info = {};
   dd_set_font(dd_ctx, ANAKTORIA_FONT );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   dd_text( dd_ctx, msh_vec3( base_x + 10, base_y - 82, 0).data, "Sphinx of black quartz, judge my vow.", &info );
   dd_end_cmd( dd_ctx );
 
-  dd_set_color( dd_ctx, DBGDRAW_BLUE);
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-  float padding = 5.5f;
-  msh_vec3_t p = msh_vec3( info.anchor.x - padding, info.anchor.y - padding, info.anchor.z-0.01 );
-  msh_vec3_t u = msh_vec3( info.width + 2 * padding, 0.0, 0.0 );
-  msh_vec3_t v = msh_vec3( 0.0, info.height + 2 * padding, 0.0 );
-  dd_quad( dd_ctx, p.data,
-                   msh_vec3_add( p, u ).data,
-                   msh_vec3_add( msh_vec3_add( p, u ), v).data,
-                   msh_vec3_add( p, v ).data );
-  dd_end_cmd(dd_ctx);
-
   dd_set_font(dd_ctx, CMU_FONT );
   dd_set_color( dd_ctx, DBGDRAW_LIGHT_BROWN );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   dd_text( dd_ctx, msh_vec3( base_x + 10, base_y - 122, 0).data, "Σωκράτης was a famous philosopher", NULL );
   dd_end_cmd( dd_ctx );
 
@@ -163,7 +153,7 @@ void frame(app_state_t* state)
   dd_text_info_t info_middle = { .vert_align=DBGDRAW_TEXT_MIDDLE };
   dd_text_info_t info_top = { .vert_align=DBGDRAW_TEXT_TOP };
 
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   dd_text( dd_ctx, msh_vec3(x, y, 0).data, "Baseline", NULL);
   dd_text( dd_ctx, msh_vec3(x+100, y, 0).data, "Bottom", &info_bottom );
   dd_text( dd_ctx, msh_vec3(x-100, y, 0).data, "Middle", &info_middle );
@@ -184,7 +174,7 @@ void frame(app_state_t* state)
   y = -60.0f;
 
   dd_set_color( dd_ctx, DBGDRAW_WHITE );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_TEXT );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
   dd_text( dd_ctx, msh_vec3(x, y, 0).data, "Left", &info_left );
   dd_text( dd_ctx, msh_vec3(x, y-32, 0).data, "Right", &info_right);
   dd_text( dd_ctx, msh_vec3(x, y-64, 0).data, "Center", &info_center );
