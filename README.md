@@ -16,4 +16,5 @@ you can see some examples of what can be achieved in dbgdraw.
 
 - No full UTF-8 support, just latin + greek character ranges
 - Only backend is OpenGL 4.5
+- MSVC does not compile this code atm.
 
