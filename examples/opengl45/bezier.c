@@ -343,32 +343,25 @@ void frame(app_state_t* state)
                         DBGDRAW_LIGHT_GRAY, DBGDRAW_GRAY, DBGDRAW_BLACK, 5.0f );
     
     float center[2] = {128.0f, 128.0f};
-    
+    float pt_a[2] = {128.0f, 128.0f};
+    float pt_b[2] = {128.0f + 32.0f, 128.0f + 64.0f};
     dd_ctx->detail_level = 4;
     dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
     dd_circle2d(dd_ctx, center, 32.0f);
     dd_set_color(dd_ctx, DBGDRAW_LIGHT_BLUE);
-    dd_rect2d(dd_ctx, center, 32.0f, 32.0f);
+    dd_rect2d(dd_ctx, pt_a, pt_b);
     
-    center[0] = 356.0f;
-    center[1] = 256.0f;
+    pt_a[0] = 356.0f; pt_b[0] = pt_a[0] + 64.0f;
+    pt_a[1] = 156.0f; pt_b[1] = pt_a[1] + 136.0f;
     dd_set_color(dd_ctx, DBGDRAW_RED);
-    dd_rounded_rect2d(dd_ctx, center, 256, 256, 32);
+    dd_rounded_rect2d(dd_ctx, pt_a, pt_b, 16.0f);
     dd_end_cmd(dd_ctx);
     
-    center[0] = 128.0f;
-    center[1] = 128.0f;
-    
-    
-    dd_set_primitive_size(dd_ctx, 6.0f);
-    dd_set_color(dd_ctx, DBGDRAW_GRAY);
+    dd_set_primitive_size(dd_ctx, 12.0f);
     dd_begin_cmd(dd_ctx, DBGDRAW_MODE_STROKE);
-    dd_rect2d( dd_ctx, center, 32.0f, 32.0f );
-    center[0] = 356.0f;
-    center[1] = 256.0f;
     dd_set_color(dd_ctx, DBGDRAW_LIGHT_RED);
-    dd_rounded_rect2d(dd_ctx, center, 256, 256, 32);
-    
+    dd_rounded_rect2d(dd_ctx, pt_a, pt_b, 16.0f);
+    dd_line2d(dd_ctx, pt_a, pt_b);
     dd_end_cmd(dd_ctx);
     
     dd_render( dd_ctx );

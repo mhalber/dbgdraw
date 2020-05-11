@@ -188,14 +188,11 @@ extern "C" {
     
     // 2d drawing API 
     int32_t dd_point2d(dd_ctx_t* ctx, float* pt_a);
-    int32_t dd_arrow2d(dd_ctx_t* ctx, float* pt_a, float* pt_b);
     int32_t dd_line2d(dd_ctx_t* ctx, float* pt_a, float* pt_b);
-    int32_t dd_rect2d(dd_ctx_t* ctx, float* pt_a, float width, float height);
+    int32_t dd_rect2d(dd_ctx_t* ctx, float* pt_a, float* pt_b);
     int32_t dd_circle2d(dd_ctx_t* ctx, float* center, float radius);
     int32_t dd_arc2d(dd_ctx_t* ctx, float* center, float radius, float angle);
-    int32_t dd_bezier2d(dd_ctx_t* ctx, float* a, float* b, float* c, float* d);
-    int32_t dd_rounded_rect2d( dd_ctx_t* ctx, float*a, float width, float height, float rounding);
-    
+    int32_t dd_rounded_rect2d( dd_ctx_t* ctx, float*a, float* b, float rounding);
     
     // Text rendering
     int32_t dd_find_font( dd_ctx_t* ctx, char* font_name );
@@ -1027,7 +1024,7 @@ dd__generate_cone_orientation( dd_vec3_t q0, dd_vec3_t q1 )
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private Draw Commands
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+#if 0
 // TODO(maciej): Possibly implement these as 3d api?
 void
 dd__vertex2d( dd_ctx_t *ctx, float* pt )
@@ -1213,50 +1210,50 @@ dd__arc2d( dd_ctx_t* ctx, float* center, float radius, float theta, int32_t reso
         break;
     }
 }
-
+#endif
 
 
 void
-dd__vertex( dd_ctx_t *ctx, float* pt )
+dd__vertex( dd_ctx_t *ctx, dd_vec3_t* pt )
 {
     float sz = ctx->primitive_size;
-    ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = {{ pt[0], pt[1], pt[2], sz }}, .col = ctx->color };
+    ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = {{ pt->x, pt->y, pt->z, sz }}, .col = ctx->color };
     ctx->cur_cmd->vertex_count++;
 }
 
 void
-dd__vertex_normal( dd_ctx_t *ctx, float* pt, float* nor )
+dd__vertex_normal( dd_ctx_t *ctx, dd_vec3_t* pt, dd_vec3_t* nor )
 {
     float sz = ctx->primitive_size;
     ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ 
-        .pos_size = {{ pt[0], pt[1], pt[2], sz }},
-        .normal = {{ nor[0], nor[1], nor[2] }}, 
+        .pos_size = {{ pt->x, pt->y, pt->z, sz }},
+        .normal = {{ nor->x, nor->y, nor->z }}, 
         .col = ctx->color };
     ctx->cur_cmd->vertex_count++;
 }
 
 void
-dd__vertex_text( dd_ctx_t *ctx, float* pt, float* uv )
+dd__vertex_text( dd_ctx_t *ctx, dd_vec3_t* pt, dd_vec2_t* uv )
 {
     dd_color_t c = ctx->color;
     c.a = 0;
     float sz = ctx->primitive_size;
     ctx->verts_data[ctx->verts_len++] = (dd_vertex_t) { 
-        .pos_size = {{ pt[0], pt[1], pt[2], sz }}, 
-        .uv = {{uv[0], uv[1]}}, 
+        .pos_size = {{ pt->x, pt->y, pt->z, sz }}, 
+        .uv = {{uv->x, uv->y}}, 
         .col = c };
     ctx->cur_cmd->vertex_count++;
 }
 
 void
-dd__line( dd_ctx_t *ctx, float* pt_a, float* pt_b )
+dd__line( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b )
 {
     dd__vertex( ctx, pt_a );
     dd__vertex( ctx, pt_b );
 }
 
 void
-dd__triangle( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c )
+dd__triangle( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c )
 {
     dd__vertex( ctx, pt_a );
     dd__vertex( ctx, pt_b );
@@ -1264,7 +1261,7 @@ dd__triangle( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c )
 }
 
 void
-dd__triangle_normal( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* normal  )
+dd__triangle_normal( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c, dd_vec3_t* normal  )
 {
     dd__vertex_normal( ctx, pt_a, normal );
     dd__vertex_normal( ctx, pt_b, normal );
@@ -1272,7 +1269,7 @@ dd__triangle_normal( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float
 }
 
 void
-dd__quad_point( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
+dd__quad_point( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c, dd_vec3_t* pt_d )
 {
     dd__vertex( ctx, pt_a );
     dd__vertex( ctx, pt_b );
@@ -1281,7 +1278,7 @@ dd__quad_point( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_
 }
 
 void
-dd__quad_stroke( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
+dd__quad_stroke( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c, dd_vec3_t* pt_d )
 {
     dd__line( ctx, pt_a, pt_b );
     dd__line( ctx, pt_b, pt_c );
@@ -1290,19 +1287,16 @@ dd__quad_stroke( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt
 }
 
 void
-dd__quad_fill( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
+dd__quad_fill( dd_ctx_t *ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c, dd_vec3_t* pt_d )
 {
     switch( ctx->cur_cmd->shading_type )
     {
         case DBGDRAW_SHADING_SOLID:
         {
-            dd_vec3_t v3_a = dd_vec3(pt_a[0], pt_a[1], pt_a[2]);
-            dd_vec3_t v3_b = dd_vec3(pt_b[0], pt_b[1], pt_b[2]);
-            dd_vec3_t v3_c = dd_vec3(pt_c[0], pt_c[1], pt_c[2]);
-            dd_vec3_t normal = dd_vec3_normalize(dd_vec3_cross(dd_vec3_sub( v3_c, v3_a ),
-                                                               dd_vec3_sub( v3_b, v3_a )));
-            dd__triangle_normal( ctx, pt_a, pt_b, pt_c, &normal.x );
-            dd__triangle_normal( ctx, pt_a, pt_c, pt_d, &normal.x );
+            dd_vec3_t normal = dd_vec3_normalize(dd_vec3_cross(dd_vec3_sub( *pt_c, *pt_a ),
+                                                               dd_vec3_sub( *pt_b, *pt_a )));
+            dd__triangle_normal( ctx, pt_a, pt_b, pt_c, &normal );
+            dd__triangle_normal( ctx, pt_a, pt_c, pt_d, &normal );
         } break;
         
         default:
@@ -1314,7 +1308,7 @@ dd__quad_fill( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d
 }
 
 void
-dd__quad( dd_ctx_t* ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
+dd__quad( dd_ctx_t* ctx, dd_vec3_t* pt_a, dd_vec3_t* pt_b, dd_vec3_t* pt_c, dd_vec3_t* pt_d )
 {
     switch( ctx->cur_cmd->draw_mode )
     {
@@ -1333,45 +1327,45 @@ dd__quad( dd_ctx_t* ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
 }
 
 void
-dd__box_point( dd_ctx_t *ctx, float* pts )
+dd__box_point( dd_ctx_t *ctx, dd_vec3_t* pts )
 {
     dd__vertex( ctx, pts + 0 );
+    dd__vertex( ctx, pts + 1 );
+    dd__vertex( ctx, pts + 2 );
     dd__vertex( ctx, pts + 3 );
+    
+    dd__vertex( ctx, pts + 4 );
+    dd__vertex( ctx, pts + 5 );
     dd__vertex( ctx, pts + 6 );
-    dd__vertex( ctx, pts + 9 );
-    
-    dd__vertex( ctx, pts + 12 );
-    dd__vertex( ctx, pts + 15 );
-    dd__vertex( ctx, pts + 18 );
-    dd__vertex( ctx, pts + 21 );
+    dd__vertex( ctx, pts + 7 );
 }
 
 void
-dd__box_stroke( dd_ctx_t *ctx, float* pts )
+dd__box_stroke( dd_ctx_t *ctx, dd_vec3_t* pts )
 {
-    dd__quad_stroke( ctx, pts +  0, pts +  3, pts +  6, pts +  9 );
-    dd__quad_stroke( ctx, pts + 12, pts + 15, pts + 18, pts + 21 );
+    dd__quad_stroke( ctx, pts + 0, pts + 1, pts + 2, pts + 3 );
+    dd__quad_stroke( ctx, pts + 4, pts + 5, pts + 6, pts + 7 );
     
-    dd__line( ctx, pts + 0, pts + 15 );
-    dd__line( ctx, pts + 3, pts + 12 );
-    dd__line( ctx, pts + 6, pts + 21 );
-    dd__line( ctx, pts + 9, pts + 18 );
+    dd__line( ctx, pts + 0, pts + 5 );
+    dd__line( ctx, pts + 1, pts + 4 );
+    dd__line( ctx, pts + 2, pts + 7 );
+    dd__line( ctx, pts + 3, pts + 6 );
 }
 
 void
-dd__box_fill( dd_ctx_t *ctx, float* pts )
+dd__box_fill( dd_ctx_t *ctx, dd_vec3_t* pts )
 {
-    dd__quad_fill( ctx, pts +  0, pts +  3, pts +  6, pts +  9 );
-    dd__quad_fill( ctx, pts + 12, pts + 15, pts + 18, pts + 21 );
+    dd__quad_fill( ctx, pts + 0, pts + 1, pts + 2, pts + 3 );
+    dd__quad_fill( ctx, pts + 4, pts + 5, pts + 6, pts + 7 );
     
-    dd__quad_fill( ctx, pts + 15, pts + 12, pts + 3, pts + 0 );
-    dd__quad_fill( ctx, pts + 15, pts + 0, pts + 9, pts + 18 );
-    dd__quad_fill( ctx, pts + 21, pts + 18, pts + 9, pts + 6 );
-    dd__quad_fill( ctx, pts + 3, pts + 12, pts + 21, pts + 6 );
+    dd__quad_fill( ctx, pts + 5, pts + 4, pts + 1, pts + 0 );
+    dd__quad_fill( ctx, pts + 5, pts + 0, pts + 3, pts + 6 );
+    dd__quad_fill( ctx, pts + 7, pts + 6, pts + 3, pts + 2 );
+    dd__quad_fill( ctx, pts + 1, pts + 4, pts + 7, pts + 2 );
 }
 
 void
-dd__box( dd_ctx_t* ctx, float* pts )
+dd__box( dd_ctx_t* ctx, dd_vec3_t* pts )
 {
     switch( ctx->cur_cmd->draw_mode )
     {
@@ -1390,7 +1384,7 @@ dd__box( dd_ctx_t* ctx, float* pts )
 }
 
 void
-dd__arc_point( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t resolution )
+dd__arc_point( dd_ctx_t *ctx, dd_vec3_t* center, float radius, float theta, int32_t resolution )
 {
     resolution = DD_MAX( 4, resolution );
     float d_theta = theta / resolution;
@@ -1405,30 +1399,30 @@ dd__arc_point( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t 
     float theta1;
     float ox1 = 0.0f, oy1 = 0.0f;
     int32_t final_res = full_circle ? resolution : resolution + 1;
-    dd_vec3_t pt = dd_vec3( 0.0f, 0.0f, center[2] );
+    dd_vec3_t pt = dd_vec3( 0.0f, 0.0f, center->z );
     for( int32_t i = 0; i < final_res; ++i )
     {
         theta1 = i * d_theta;
         ox1 = radius * DBGDRAW_SIN( theta1 );
         oy1 = radius * DBGDRAW_COS( theta1 );
         
-        pt.x = center[0] + ox1;
-        pt.y = center[1] + oy1;
-        dd__vertex( ctx, &pt.x );
+        pt.x = center->x + ox1;
+        pt.y = center->y + oy1;
+        dd__vertex( ctx, &pt );
     }
 }
 
 void
-dd__arc_stroke( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t resolution )
+dd__arc_stroke( dd_ctx_t *ctx, dd_vec3_t* center, float radius, float theta, int32_t resolution )
 {
     float d_theta = theta / resolution;
     int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
     
-    dd_vec3_t pt_a = dd_vec3( center[0], center[1], center[2] );
-    dd_vec3_t pt_b = dd_vec3( center[0], center[1]+radius, center[2] );
+    dd_vec3_t pt_a = dd_vec3( center->x, center->y, center->z );
+    dd_vec3_t pt_b = dd_vec3( center->x, center->y+radius, center->z );
     if( !full_circle )
     {
-        dd__line( ctx, &pt_a.x, &pt_b.x );
+        dd__line( ctx, &pt_a, &pt_b );
     }
     
     float theta1, theta2;
@@ -1443,21 +1437,21 @@ dd__arc_stroke( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t
         oy1 = radius * DBGDRAW_COS( theta1 );
         oy2 = radius * DBGDRAW_COS( theta2 );
         
-        pt_a.x = center[0] + ox1;
-        pt_a.y = center[1] + oy1;
-        pt_b.x = center[0] + ox2;
-        pt_b.y = center[1] + oy2;
-        dd__line( ctx, &pt_a.x, &pt_b.x );
+        pt_a.x = center->x + ox1;
+        pt_a.y = center->y + oy1;
+        pt_b.x = center->x + ox2;
+        pt_b.y = center->y + oy2;
+        dd__line( ctx, &pt_a, &pt_b );
     }
     
     
     if( !full_circle )
     {
-        pt_a.x = center[0];
-        pt_a.y = center[1];
-        pt_b.x = center[0] + ox2;
-        pt_b.y = center[1] + oy2;
-        dd__line( ctx, &pt_b.x, &pt_a.x );
+        pt_a.x = center->x;
+        pt_a.y = center->y;
+        pt_b.x = center->x + ox2;
+        pt_b.y = center->y + oy2;
+        dd__line( ctx, &pt_b, &pt_a );
     }
 }
 
@@ -2025,9 +2019,8 @@ dd__torus_fill( dd_ctx_t *ctx, dd_vec3_t center, float radius_a, float radius_b,
 // Public Draw Commands
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if 1
 int32_t
-dd_point2d(dd_ctx_t *ctx, float* a)
+dd__point_ex(dd_ctx_t *ctx, float* a, uint8_t is_3d)
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( a );
@@ -2036,13 +2029,26 @@ dd_point2d(dd_ctx_t *ctx, float* a)
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd__vertex2d( ctx, a );
+    dd_vec3_t pt_a = dd_vec3(a[0], a[1], is_3d ? a[2] : 0.0f);
+    dd__vertex( ctx, &pt_a );
     
     return DBGDRAW_ERR_OK;
 }
 
 int32_t
-dd_line2d(dd_ctx_t* ctx, float* a, float* b)
+dd_point( dd_ctx_t *ctx, float* a )
+{
+    return dd__point_ex(ctx, a, 1);
+}
+
+int32_t
+dd_point2d( dd_ctx_t *ctx, float* a )
+{
+    return dd__point_ex(ctx, a, 0);
+}
+
+int32_t
+dd__line_ex(dd_ctx_t *ctx, float* a, float* b, uint8_t is_3d)
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( a );
@@ -2052,172 +2058,9 @@ dd_line2d(dd_ctx_t* ctx, float* a, float* b)
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data,  ctx->verts_len+new_verts,  ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd__line2d( ctx, a, b );
-    
-    return DBGDRAW_ERR_OK;
-}
-
-int32_t
-dd_circle2d(dd_ctx_t* ctx, float* center, float radius )
-{
-    DBGDRAW_ASSERT( ctx );
-    DBGDRAW_ASSERT( center );
-    
-    int32_t resolution = 1 << (ctx->detail_level + 2);
-    int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
-    mode_vert_count[DBGDRAW_MODE_POINT]  = resolution;
-    mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution;
-    mode_vert_count[DBGDRAW_MODE_FILL]   = 3*resolution;
-    int32_t new_verts = mode_vert_count[ctx->cur_cmd->draw_mode];
-    
-    DBGDRAW_VALIDATE(ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD);
-    DBGDRAW_HANDLE_OUT_OF_MEMORY(ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t));
-    
-    dd__arc2d(ctx, center, radius, (float)DBGDRAW_TWO_PI, resolution);
-    
-    return DBGDRAW_ERR_OK;
-}
-
-int32_t
-dd_rect2d(dd_ctx_t *ctx, float* a, float width, float height)
-{
-    DBGDRAW_ASSERT( ctx );
-    DBGDRAW_ASSERT( a );
-    
-    int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
-    mode_vert_count[DBGDRAW_MODE_POINT]  = 4;
-    mode_vert_count[DBGDRAW_MODE_STROKE] = 8;
-    mode_vert_count[DBGDRAW_MODE_FILL]   = 6;
-    int32_t new_verts = mode_vert_count[ctx->cur_cmd->draw_mode];
-    DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
-    DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
-    
-    dd_vec2_t pt_a = dd_vec2( a[0], a[1] );
-    dd_vec2_t pt_b = dd_vec2( a[0]+width, a[1] );
-    dd_vec2_t pt_d = dd_vec2( a[0], a[1]+height );
-    dd_vec2_t pt_c = dd_vec2( a[0]+width, a[1]+height );
-    
-    dd__quad2d( ctx, &pt_a.x, &pt_b.x, &pt_c.x, &pt_d.x );
-    
-    return DBGDRAW_ERR_OK;
-}
-
-int32_t
-dd_rounded_rect2d( dd_ctx_t* ctx, float*a, float width, float height, float rounding)
-{
-    (void) rounding;
-    (void) height;
-    (void) width;
-    
-    DBGDRAW_ASSERT( ctx );
-    DBGDRAW_ASSERT( a );
-    
-    int32_t resolution = 1 << (ctx->detail_level + 2);
-    int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
-    mode_vert_count[DBGDRAW_MODE_POINT]  = resolution + 4;
-    mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution + 8;
-    mode_vert_count[DBGDRAW_MODE_FILL]   = 3*resolution + 6;
-    int32_t new_verts = mode_vert_count[ctx->cur_cmd->draw_mode];
-    
-    DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
-    DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
-    
-    float d_theta = (float)DBGDRAW_TWO_PI / resolution;
-    float r = rounding;
-    float w = width - 2*r;
-    float h = height - 2*r;
-    float offsets_x[4] = {w, -r, -w, r};
-    float offsets_y[4] = {-r, -h, r, h};
-    float pt0[2] = { a[0] + rounding, a[1] };
-    
-    if(ctx->cur_cmd->draw_mode == DBGDRAW_MODE_FILL )
-    {
-        dd_vec2_t corners[4] = {0};
-        for( int i = 0; i < 4; ++i )
-        {
-            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
-            float pt1[2] = {0.0f, 0.0f};
-            corners[i] = dd_vec2(pt0[0], pt0[1]);
-            
-            for( int32_t j = 0; j < resolution / 4; ++j )
-            {
-                float theta = init_theta + j * d_theta;
-                float ox1 = offsets_x[i] + r * sinf( theta ); float ox2 = offsets_x[i] + r * sinf( theta + d_theta );
-                float oy1 = offsets_y[i] + r * cosf( theta ); float oy2 = offsets_y[i] + r * cosf( theta + d_theta );
-                
-                dd_point2d( ctx, pt0 );
-                pt1[0] = pt0[0] + ox1;
-                pt1[1] = pt0[1] + oy1;
-                dd_point2d( ctx, pt1 );
-                pt1[0] = pt0[0] + ox2;
-                pt1[1] = pt0[1] + oy2;
-                dd_point2d( ctx, pt1 );
-            }
-            pt0[0] = pt1[0];
-            pt0[1] = pt1[1];
-        }
-        
-        dd__triangle2d( ctx, &corners[0].x, &corners[1].x, &corners[2].x);
-        dd__triangle2d( ctx, &corners[2].x, &corners[3].x, &corners[0].x);
-    }
-    else if (ctx->cur_cmd->draw_mode == DBGDRAW_MODE_STROKE)
-    {
-        for( int i = 0; i < 4; ++i )
-        {
-            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
-            float pt1[2] = {0.0f, 0.0f};
-            pt1[0] = pt0[0];
-            pt1[1] = pt0[1];
-            for( int32_t j = 0; j < resolution / 4 + 1; ++j )
-            {
-                float theta = init_theta + j * d_theta;
-                float ox1 = offsets_x[i] + r * sinf( theta );
-                float oy1 = offsets_y[i] + r * cosf( theta );
-                dd_point2d( ctx, pt1 );
-                pt1[0] = pt0[0] + ox1;
-                pt1[1] = pt0[1] + oy1;
-                dd_point2d( ctx, pt1 );
-            }
-            pt0[0] = pt1[0];
-            pt0[1] = pt1[1];
-        }
-    }
-    else if (ctx->cur_cmd->draw_mode == DBGDRAW_MODE_POINT)
-    {
-        for( int i = 0; i < 4; ++i )
-        {
-            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
-            float pt1[2] = {0.0f, 0.0f};
-            for( int32_t j = 0; j < resolution / 4 + 1; ++j )
-            {
-                float theta = init_theta + j * d_theta;
-                float ox1 = offsets_x[i] + r * sinf( theta );
-                float oy1 = offsets_y[i] + r * cosf( theta );
-                pt1[0] = pt0[0] + ox1;
-                pt1[1] = pt0[1] + oy1;
-                dd_point2d( ctx, pt1 );
-            }
-            pt0[0] = pt1[0];
-            pt0[1] = pt1[1];
-        }
-    }
-    
-    return DBGDRAW_ERR_OK;
-}
-
-#endif
-
-int32_t
-dd_point( dd_ctx_t *ctx, float* a )
-{
-    DBGDRAW_ASSERT( ctx );
-    DBGDRAW_ASSERT( a );
-    
-    int32_t new_verts = 1;
-    DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
-    DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
-    
-    dd__vertex( ctx, (dd_vec3_t*)a );
+    dd_vec3_t pt_a = dd_vec3(a[0], a[1], is_3d ? a[2] : 0.0f);
+    dd_vec3_t pt_b = dd_vec3(b[0], b[1], is_3d ? b[2] : 0.0f);
+    dd__line( ctx, &pt_a, &pt_b );
     
     return DBGDRAW_ERR_OK;
 }
@@ -2225,17 +2068,13 @@ dd_point( dd_ctx_t *ctx, float* a )
 int32_t
 dd_line(dd_ctx_t *ctx, float* a, float* b)
 {
-    DBGDRAW_ASSERT( ctx );
-    DBGDRAW_ASSERT( a );
-    DBGDRAW_ASSERT( b );
-    
-    int32_t new_verts = 2;
-    DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
-    DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data,  ctx->verts_len+new_verts,  ctx->verts_cap, sizeof(dd_vertex_t) );
-    
-    dd__line( ctx, (dd_vec3_t*)a, (dd_vec3_t*)b );
-    
-    return DBGDRAW_ERR_OK;
+    return dd__line_ex(ctx, a, b, 1);
+}
+
+int32_t
+dd_line2d(dd_ctx_t *ctx, float* a, float* b)
+{
+    return dd__line_ex(ctx, a, b, 0);
 }
 
 int32_t
@@ -2255,13 +2094,13 @@ dd_quad( dd_ctx_t *ctx, float* a, float* b, float* c, float* d )
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd__quad( ctx, a, b, c, d );
+    dd__quad( ctx, (dd_vec3_t*)a, (dd_vec3_t*)b, (dd_vec3_t*)c, (dd_vec3_t*)d );
     
     return DBGDRAW_ERR_OK;
 }
 
-int32_t
-dd_rect( dd_ctx_t *ctx, float* a, float* b )
+int32_t 
+dd__rect_ex(dd_ctx_t* ctx, float* a, float* b, uint8_t is_3d)
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( a );
@@ -2275,12 +2114,118 @@ dd_rect( dd_ctx_t *ctx, float* a, float* b )
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd_vec3_t pt_a = dd_vec3( a[0], a[1], a[2] );
-    dd_vec3_t pt_b = dd_vec3( a[0], b[1], a[2] );
-    dd_vec3_t pt_d = dd_vec3( b[0], a[1], b[2] );
-    dd_vec3_t pt_c = dd_vec3( b[0], b[1], b[2] );
+    dd_vec3_t pt_a = dd_vec3( a[0], a[1], is_3d ? a[2] : 0.0f );
+    dd_vec3_t pt_b = dd_vec3( a[0], b[1], is_3d ? a[2] : 0.0f );
+    dd_vec3_t pt_d = dd_vec3( b[0], a[1], is_3d ? b[2] : 0.0f );
+    dd_vec3_t pt_c = dd_vec3( b[0], b[1], is_3d ? b[2] : 0.0f );
     
     dd__quad( ctx, &pt_a, &pt_b, &pt_c, &pt_d );
+    
+    return DBGDRAW_ERR_OK;
+}
+int32_t
+dd_rect( dd_ctx_t *ctx, float* a, float* b )
+{
+    return dd__rect_ex(ctx, a, b, 1);
+}
+
+int32_t
+dd_rect2d(dd_ctx_t *ctx, float* a, float* b)
+{
+    return dd__rect_ex(ctx, a, b, 0);
+}
+
+
+int32_t
+dd_rounded_rect2d( dd_ctx_t* ctx, float*a, float *b, float rounding)
+{
+    DBGDRAW_ASSERT( ctx );
+    DBGDRAW_ASSERT( a );
+    
+    int32_t resolution = 1 << (ctx->detail_level + 2);
+    int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
+    mode_vert_count[DBGDRAW_MODE_POINT]  = resolution + 4;
+    mode_vert_count[DBGDRAW_MODE_STROKE] = 2*resolution + 8;
+    mode_vert_count[DBGDRAW_MODE_FILL]   = 3*resolution + 6;
+    int32_t new_verts = mode_vert_count[ctx->cur_cmd->draw_mode];
+    
+    DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
+    DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
+    
+    float d_theta = (float)DBGDRAW_TWO_PI / resolution;
+    float r = rounding;
+    float w = (b[0] - a[0]) - 2*r;
+    float h = (b[1] - a[1]) - 2*r;
+    float offsets_x[4] = {w, -r, -w, r};
+    float offsets_y[4] = {-r, -h, r, h};
+    dd_vec3_t pt0 = dd_vec3( a[0]+r, b[1], 0.0f);
+    
+    if(ctx->cur_cmd->draw_mode == DBGDRAW_MODE_FILL )
+    {
+        dd_vec3_t corners[4] = {0};
+        for( int i = 0; i < 4; ++i )
+        {
+            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
+            dd_vec3_t pt1 = dd_vec3(0.0f, 0.0f, 0.0f);
+            corners[i] = dd_vec3(pt0.x, pt0.y, 0.0f);
+            
+            for( int32_t j = 0; j < resolution / 4; ++j )
+            {
+                float theta = init_theta + j * d_theta;
+                float ox1 = offsets_x[i] + r * sinf( theta ); float ox2 = offsets_x[i] + r * sinf( theta + d_theta );
+                float oy1 = offsets_y[i] + r * cosf( theta ); float oy2 = offsets_y[i] + r * cosf( theta + d_theta );
+                
+                dd__vertex(ctx, &pt0);
+                pt1.x = pt0.x + ox1;
+                pt1.y = pt0.y + oy1;
+                dd__vertex(ctx, &pt1);
+                pt1.x = pt0.x + ox2;
+                pt1.y = pt0.y + oy2;
+                dd__vertex(ctx, &pt1);
+            }
+            pt0 = pt1;
+        }
+        
+        dd__triangle(ctx, &corners[0], &corners[1], &corners[2]);
+        dd__triangle(ctx, &corners[2], &corners[3], &corners[0]);
+    }
+    else if (ctx->cur_cmd->draw_mode == DBGDRAW_MODE_STROKE)
+    {
+        for( int i = 0; i < 4; ++i )
+        {
+            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
+            dd_vec3_t pt1 = pt0;
+            for( int32_t j = 0; j < resolution / 4 + 1; ++j )
+            {
+                float theta = init_theta + j * d_theta;
+                float ox1 = offsets_x[i] + r * sinf( theta );
+                float oy1 = offsets_y[i] + r * cosf( theta );
+                dd__vertex( ctx, &pt1 );
+                pt1.x = pt0.x + ox1;
+                pt1.y = pt0.y + oy1;
+                dd__vertex( ctx, &pt1 );
+            }
+            pt0 = pt1;
+        }
+    }
+    else if (ctx->cur_cmd->draw_mode == DBGDRAW_MODE_POINT)
+    {
+        for( int i = 0; i < 4; ++i )
+        {
+            float init_theta = i * (float)DBGDRAW_PI_OVER_TWO;
+            dd_vec3_t pt1 = dd_vec3(0.0f, 0.0f, 0.0f);
+            for( int32_t j = 0; j < resolution / 4 + 1; ++j )
+            {
+                float theta = init_theta + j * d_theta;
+                float ox1 = offsets_x[i] + r * sinf( theta );
+                float oy1 = offsets_y[i] + r * cosf( theta );
+                pt1.x = pt0.x + ox1;
+                pt1.y = pt0.y + oy1;
+                dd__vertex( ctx, &pt1 );
+            }
+            pt0 = pt1;
+        }
+    }
     
     return DBGDRAW_ERR_OK;
 }
@@ -2316,7 +2261,7 @@ dd_billboard_rect(dd_ctx_t *ctx, float* p, float width, float height)
 }
 
 int32_t
-dd_circle(dd_ctx_t *ctx, float* center, float radius)
+dd__circle_ex(dd_ctx_t* ctx, float* center, float radius, uint8_t is_3d)
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( center );
@@ -2331,9 +2276,22 @@ dd_circle(dd_ctx_t *ctx, float* center, float radius)
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd__arc( ctx, (dd_vec3_t*)center, radius, (float)DBGDRAW_TWO_PI, resolution, 0 );
+    dd_vec3_t center_pt = dd_vec3(center[0], center[1], is_3d ? center[2] : 0.0f);
+    dd__arc( ctx, &center_pt, radius, (float)DBGDRAW_TWO_PI, resolution, 0 );
     
     return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_circle(dd_ctx_t *ctx, float* center, float radius)
+{
+    return dd__circle_ex(ctx, center, radius, 1);
+}
+
+int32_t
+dd_circle2d(dd_ctx_t* ctx, float* center, float radius )
+{
+    return dd__circle_ex(ctx, center, radius, 0);
 }
 
 int32_t
@@ -2377,7 +2335,7 @@ dd_billboard_circle( dd_ctx_t *ctx, float* center, float radius )
 }
 
 int32_t
-dd_arc( dd_ctx_t *ctx, float* center, float radius, float theta )
+dd__arc_ex(dd_ctx_t *ctx, float* center, float radius, float theta, uint8_t is_3d)
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( center );
@@ -2392,10 +2350,24 @@ dd_arc( dd_ctx_t *ctx, float* center, float radius, float theta )
     DBGDRAW_VALIDATE( ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD );
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
-    dd__arc( ctx, (dd_vec3_t*)center, radius, theta, resolution, 0 );
+    dd_vec3_t center_pt = dd_vec3(center[0], center[1], is_3d ? center[2] : 0.0f);
+    dd__arc( ctx, center, radius, theta, resolution, 0 );
     
     return DBGDRAW_ERR_OK;
 }
+
+int32_t
+dd_arc(dd_ctx_t *ctx, float* center, float radius, float theta)
+{
+    return dd__arc_ex(ctx, center, radius, theta, 1);
+}
+
+int32_t
+dd_arc2d(dd_ctx_t *ctx, float* center, float radius, float theta)
+{
+    return dd__arc_ex(ctx, center, radius, theta, 0);
+}
+
 
 int32_t
 dd_aabb(dd_ctx_t *ctx, float* a, float* b)
