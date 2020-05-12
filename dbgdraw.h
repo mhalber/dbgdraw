@@ -123,13 +123,13 @@ extern "C" {
         DBGDRAW_SHADING_COUNT
     } dd_shading_t;
     
-    typedef enum dd_fill2d_t
+    typedef enum dd_fill_t
     {
         DBGDRAW_FILL_FLAT,
         DBGDRAW_FILL_LINEAR_GRADIENT,
         
         DBGDRAW_FILL_COUNT
-    } dd_fill2d_t;
+    } dd_fill_t;
     
     typedef enum dd_projection_type
     {
@@ -139,7 +139,7 @@ extern "C" {
     
     typedef struct dd_context_desc dd_ctx_desc_t;
     typedef struct dd_new_frame_info dd_new_frame_info_t;
-    typedef struct dd_context dd_ctx_t;
+    typedef struct dd_ctx_t dd_ctx_t;
     typedef struct dd_text_info dd_text_info_t;
     
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,7 +160,7 @@ extern "C" {
     
     int32_t dd_set_transform(dd_ctx_t *ctx, float* xform);
     int32_t dd_set_shading_type(dd_ctx_t *ctx, dd_shading_t shading_type);
-    int32_t dd_set_fill2d_type(dd_ctx_t *ctx, dd_fill2d_t fill_type);
+    int32_t dd_set_fill_type(dd_ctx_t *ctx, dd_fill_t fill_type);
     int32_t dd_set_color(dd_ctx_t *ctx, dd_color_t color);
     int32_t dd_set_gradient_a(dd_ctx_t *ctx, dd_color_t color, float* pos);
     int32_t dd_set_gradient_b(dd_ctx_t *ctx, dd_color_t color, float* pos);
@@ -195,12 +195,12 @@ extern "C" {
     int32_t dd_rounded_rect2d( dd_ctx_t* ctx, float*a, float* b, float rounding);
     
     // Text rendering
-    int32_t dd_find_font( dd_ctx_t* ctx, char* font_name );
-    int32_t dd_set_font( dd_ctx_t *ctx, int32_t font_idx );
-    int32_t dd_text( dd_ctx_t *ctx, float* pos, char* str, dd_text_info_t* info );
-    void    dd_get_text_size_font_space( dd_ctx_t* ctx, int32_t font_idx, char* str, int32_t strlen,
+    int32_t dd_find_font(dd_ctx_t* ctx, char* font_name);
+    int32_t dd_set_font(dd_ctx_t *ctx, int32_t font_idx);
+    int32_t dd_text( dd_ctx_t *ctx, float* pos, const char* str, dd_text_info_t* info );
+    void    dd_get_text_size_font_space(dd_ctx_t* ctx, int32_t font_idx, const char* str, int32_t strlen,
                                         float* width, float* height );
-    int32_t dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf,
+    int32_t dd_init_font_from_memory(dd_ctx_t* ctx, const void* ttf_buf,
                                      const char* name, int32_t font_size, int32_t width, int32_t height,
                                      int32_t* font_idx );
 #ifndef DBGDRAW_NO_STDIO
@@ -308,6 +308,7 @@ extern "C" {
     dd_vec3_t dd_vec3_cross( dd_vec3_t a, dd_vec3_t b );
     dd_vec3_t dd_vec3_invert( dd_vec3_t v );
     float     dd_vec3_norm( dd_vec3_t v );
+    float     dd_vec3_norm_sq( dd_vec3_t v );
     dd_vec3_t dd_vec3_normalize( dd_vec3_t v ) ;
     dd_vec4_t dd_vec3_to_vec4( dd_vec3_t v );
     dd_vec3_t dd_mat3_vec3_mul( dd_mat3_t m, dd_vec3_t v );
@@ -448,14 +449,19 @@ extern "C" {
     } dd_font_data_t;
 #endif
     
-    typedef struct dd_context
+    typedef struct dd_ctx_t
     {
         /* User accessible state */
         dd_color_t color;
+        dd_color_t gradient_a_col;
+        dd_color_t gradient_b_col;
+        dd_vec3_t gradient_a_pt;
+        dd_vec3_t gradient_b_pt;
         dd_mat4_t xform;
         uint8_t detail_level;
         uint8_t frustum_cull;
         dd_shading_t shading_type;
+        dd_fill_t fill_type;
         float primitive_size;
         
         /* Command storage */
@@ -685,6 +691,15 @@ dd_set_shading_type( dd_ctx_t *ctx, dd_shading_t shading_type )
 }
 
 int32_t
+dd_set_fill_type( dd_ctx_t *ctx, dd_fill_t fill_type )
+{
+    DBGDRAW_ASSERT( ctx );
+    ctx->fill_type = fill_type;
+    return DBGDRAW_ERR_OK;
+}
+
+
+int32_t
 dd_set_detail_level( dd_ctx_t *ctx, uint8_t level )
 {
     DBGDRAW_ASSERT( ctx );
@@ -697,6 +712,26 @@ dd_set_color( dd_ctx_t *ctx, dd_color_t color )
 {
     DBGDRAW_ASSERT( ctx );
     ctx->color = color;
+    return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_gradient_a( dd_ctx_t *ctx, dd_color_t color, float* pos )
+{
+    DBGDRAW_ASSERT( ctx );
+    DBGDRAW_ASSERT( pos );
+    ctx->gradient_a_col = color;
+    ctx->gradient_a_pt = dd_vec3( pos[0], pos[1], pos[2] );
+    return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_gradient_b( dd_ctx_t *ctx, dd_color_t color, float* pos )
+{
+    DBGDRAW_ASSERT( ctx );
+    DBGDRAW_ASSERT( pos );
+    ctx->gradient_b_col = color;
+    ctx->gradient_b_pt= dd_vec3( pos[0], pos[1], pos[2] );
     return DBGDRAW_ERR_OK;
 }
 
@@ -1024,200 +1059,23 @@ dd__generate_cone_orientation( dd_vec3_t q0, dd_vec3_t q1 )
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Private Draw Commands
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#if 0
-// TODO(maciej): Possibly implement these as 3d api?
-void
-dd__vertex2d( dd_ctx_t *ctx, float* pt )
-{
-    float sz = ctx->primitive_size;
-    ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = {{ pt[0], pt[1], 0.0, sz }}, .col = ctx->color };
-    ctx->cur_cmd->vertex_count++;
-}
-
-void
-dd__line2d( dd_ctx_t *ctx, float* pt_a, float* pt_b )
-{
-    dd__vertex2d( ctx, pt_a );
-    dd__vertex2d( ctx, pt_b );
-}
-
-void
-dd__triangle2d( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c )
-{
-    dd__vertex2d( ctx, pt_a );
-    dd__vertex2d( ctx, pt_b );
-    dd__vertex2d( ctx, pt_c );
-}
-
-void
-dd__quad2d_point( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
-{
-    dd__vertex2d( ctx, pt_a );
-    dd__vertex2d( ctx, pt_b );
-    dd__vertex2d( ctx, pt_c );
-    dd__vertex2d( ctx, pt_d );
-}
-
-void
-dd__quad2d_stroke( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
-{
-    dd__line2d( ctx, pt_a, pt_b );
-    dd__line2d( ctx, pt_b, pt_c );
-    dd__line2d( ctx, pt_c, pt_d );
-    dd__line2d( ctx, pt_d, pt_a );
-}
-
-void
-dd__quad2d_fill( dd_ctx_t *ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
-{
-    dd__triangle2d( ctx, pt_a, pt_b, pt_c );
-    dd__triangle2d( ctx, pt_a, pt_c, pt_d );
-}
-
-void
-dd__quad2d( dd_ctx_t* ctx, float* pt_a, float* pt_b, float* pt_c, float* pt_d )
-{
-    switch( ctx->cur_cmd->draw_mode )
-    {
-        case DBGDRAW_MODE_POINT:
-        dd__quad2d_point( ctx, pt_a, pt_b, pt_c, pt_d );
-        break;
-        case DBGDRAW_MODE_STROKE:
-        dd__quad2d_stroke( ctx, pt_a, pt_b, pt_c, pt_d );
-        break;
-        case DBGDRAW_MODE_FILL:
-        dd__quad2d_fill( ctx, pt_a, pt_b, pt_c, pt_d );
-        break;
-        default:
-        break;
-    }
-}
-
-
-void
-dd__arc2d_point( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t resolution )
-{
-    resolution = DD_MAX( 4, resolution );
-    float d_theta = theta / resolution;
-    int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
-    
-    if( !full_circle )
-    {
-        dd__vertex2d( ctx, center );
-    }
-    
-    float theta1;
-    float ox1 = 0.0f, oy1 = 0.0f;
-    int32_t final_res = full_circle ? resolution : resolution + 1;
-    dd_vec2_t pt = dd_vec2( 0.0f, 0.0f );
-    for( int32_t i = 0; i < final_res; ++i )
-    {
-        theta1 = i * d_theta;
-        ox1 = radius * DBGDRAW_SIN( theta1 );
-        oy1 = radius * DBGDRAW_COS( theta1 );
-        
-        pt.x = center[0] + ox1;
-        pt.y = center[1] + oy1;
-        dd__vertex2d( ctx, &pt.x );
-    }
-}
-
-void
-dd__arc2d_stroke( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t resolution )
-{
-    float d_theta = theta / resolution;
-    int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
-    
-    dd_vec2_t pt_a = dd_vec2( center[0], center[1] );
-    dd_vec2_t pt_b = dd_vec2( center[0], center[1]+radius );
-    if( !full_circle )
-    {
-        dd__line2d( ctx, &pt_a.x, &pt_b.x);
-    }
-    
-    float theta1, theta2;
-    float ox1, ox2, oy1, oy2;
-    ox1 = ox2 = oy1 = oy2 = 0.0f;
-    for( int32_t i = 0; i < resolution; ++i )
-    {
-        theta1 = i * d_theta;
-        theta2 = (i + 1) * d_theta;
-        ox1 = radius * DBGDRAW_SIN( theta1 );
-        ox2 = radius * DBGDRAW_SIN( theta2 );
-        oy1 = radius * DBGDRAW_COS( theta1 );
-        oy2 = radius * DBGDRAW_COS( theta2 );
-        
-        pt_a.x = center[0] + ox1;
-        pt_a.y = center[1]+ oy1;
-        pt_b.x = center[0] + ox2;
-        pt_b.y = center[1]+ oy2;
-        dd__line2d( ctx, &pt_a.x, &pt_b.x );
-    }
-    
-    if( !full_circle )
-    {
-        pt_a.x = center[0];
-        pt_a.y = center[1];
-        pt_b.x = center[0] + ox2;
-        pt_b.y = center[1] + oy2;
-        dd__line2d( ctx, &pt_b.x, &pt_a.x );
-    }
-}
-
-void
-dd__arc2d_fill( dd_ctx_t *ctx, float* center, float radius, float theta, int32_t resolution )
-{
-    float d_theta = theta / resolution;
-    
-    float theta1, theta2;
-    float ox1, ox2, oy1, oy2;
-    ox1 = ox2 = oy1 = oy2 = 0.0f;
-    dd_vec2_t pt_a = dd_vec2( 0.0f, 0.0f );
-    dd_vec2_t pt_b = dd_vec2( 0.0f, 0.0f );
-    for (int32_t i = 0; i < resolution; ++i)
-    {
-        theta1 = i * d_theta;
-        theta2 = (i + 1) * d_theta;
-        ox1 = radius * DBGDRAW_SIN( theta1 );
-        ox2 = radius * DBGDRAW_SIN( theta2 );
-        oy1 = radius * DBGDRAW_COS( theta1 );
-        oy2 = radius * DBGDRAW_COS( theta2 );
-        
-        pt_a.x = center[0] + ox1;
-        pt_a.y = center[1] + oy1;
-        pt_b.x = center[0] + ox2;
-        pt_b.y = center[1] + oy2;
-        
-        dd__triangle2d( ctx, center, &pt_a.x, &pt_b.x );
-    }
-}
-
-void
-dd__arc2d( dd_ctx_t* ctx, float* center, float radius, float theta, int32_t resolution )
-{
-    switch( ctx->cur_cmd->draw_mode )
-    {
-        case DBGDRAW_MODE_POINT:
-        dd__arc2d_point( ctx, center, radius, theta, resolution >> 1 );
-        break;
-        case DBGDRAW_MODE_STROKE:
-        dd__arc2d_stroke( ctx, center, radius, theta, resolution );
-        break;
-        case DBGDRAW_MODE_FILL:
-        dd__arc2d_fill( ctx, center, radius, theta, resolution );
-        break;
-        default:
-        break;
-    }
-}
-#endif
-
-
 void
 dd__vertex( dd_ctx_t *ctx, dd_vec3_t* pt )
 {
     float sz = ctx->primitive_size;
-    ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = {{ pt->x, pt->y, pt->z, sz }}, .col = ctx->color };
+    dd_color_t out_color = ctx->color;
+    
+    if (ctx->fill_type == DBGDRAW_FILL_LINEAR_GRADIENT)
+    {
+        dd_vec3_t ba = dd_vec3_sub(ctx->gradient_b_pt, ctx->gradient_a_pt);
+        dd_vec3_t pa = dd_vec3_sub(*pt, ctx->gradient_a_pt);
+        float dot = dd_vec3_dot(pa, ba);
+        float ba_norm = dd_vec3_norm_sq( ba );
+        float t = DD_MAX( DD_MIN( dot / ba_norm, 1.0f), 0.0f);
+        dd_color_t gradient_color = dd_interpolate_color(ctx->gradient_a_col, ctx->gradient_b_col, t);
+        out_color = gradient_color;
+    }
+    ctx->verts_data[ctx->verts_len++] = (dd_vertex_t){ .pos_size = {{ pt->x, pt->y, pt->z, sz }}, .col = out_color };
     ctx->cur_cmd->vertex_count++;
 }
 
@@ -2351,7 +2209,7 @@ dd__arc_ex(dd_ctx_t *ctx, float* center, float radius, float theta, uint8_t is_3
     DBGDRAW_HANDLE_OUT_OF_MEMORY( ctx->verts_data, ctx->verts_len+new_verts, ctx->verts_cap, sizeof(dd_vertex_t) );
     
     dd_vec3_t center_pt = dd_vec3(center[0], center[1], is_3d ? center[2] : 0.0f);
-    dd__arc( ctx, center, radius, theta, resolution, 0 );
+    dd__arc( ctx, &center_pt, radius, theta, resolution, 0 );
     
     return DBGDRAW_ERR_OK;
 }
@@ -2711,10 +2569,10 @@ dd_init_font_from_memory( dd_ctx_t* ctx, const void* ttf_buf,
 }
 
 /* Functions below are incorrect, as they dont correctly decode utf-8, just a subset including latin and greek */
-char*
-dd__decode_char_incorrect( char* str, uint32_t* cp )
+const char*
+dd__decode_char_incorrect( const char* str, uint32_t* cp )
 {
-    char* str_cpy = str;
+    const char* str_cpy = str;
     uint8_t ch = (uint8_t)(*str_cpy);
     if( ch < 128 ) { *cp = (uint32_t)*str_cpy++; }
     else {
@@ -2746,7 +2604,7 @@ dd__strlen_incorrect( const char* str )
 }
 
 void
-dd_get_text_size_font_space( dd_ctx_t* ctx, int32_t font_idx, char* str, int32_t strlen, float* width, float* height )
+dd_get_text_size_font_space( dd_ctx_t* ctx, int32_t font_idx, const char* str, int32_t strlen, float* width, float* height )
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( str );
@@ -2822,7 +2680,7 @@ dd_set_font( dd_ctx_t *ctx, int32_t font_idx )
 // requested latin and greek chars. Real deal needs a hashtable most likely
 // dd_vertex_t* start_ptr = ctx->verts_data + ctx->verts_len;
 int32_t
-dd_text( dd_ctx_t *ctx, float* pos, char* str, dd_text_info_t* info )
+dd_text( dd_ctx_t *ctx, float* pos, const char* str, dd_text_info_t* info )
 {
     DBGDRAW_ASSERT( ctx );
     DBGDRAW_ASSERT( pos );
@@ -3181,6 +3039,12 @@ dd_vec3_normalize( dd_vec3_t v )
 {
     float denom = 1.0f / sqrtf( v.x * v.x + v.y * v.y + v.z * v.z );
     return dd_vec3( v.x * denom, v.y * denom, v.z * denom );
+}
+
+float
+dd_vec3_norm_sq( dd_vec3_t v )
+{
+    return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
 float

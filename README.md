@@ -1,6 +1,6 @@
-## Work in progress
+### Work in progress
 
-# dbgdraw
+## dbgdraw
 
 dbgdraw is intended to be a small immediate mode library for putting simple graphics on the screen. Below
 you can see some examples of what can be achieved in dbgdraw.
@@ -16,5 +16,62 @@ you can see some examples of what can be achieved in dbgdraw.
 
 - No full UTF-8 support, just latin + greek character ranges
 - Only backend is OpenGL 4.5
-- MSVC does not compile this code atm.
 
+### Usage
+
+dbgdraw is built around the familiar idea of context. To start drawing, one needs to initialize context using `dd_init`. Then on each frame some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the 'dd_new_frame' call. Similarly, at the end of the frame, user requests the content to be rendered using `dd_render`. Once application is finished, or context is no longer needed, it can be removed using `dd_term`.
+
+Within each frame, user can begin issueing drawing commands. These need to be delimeted by the `dd_begin_cmd` and `dd_end_cmd`. Within, user can request any number of primitives to be drawn, using calls like `dd_line, `dd_sphere`, `dd_aabb`, and so on. There are number of state modifying functions of the form `dd_set_x` - for example `dd_set_color` will modify color of primitives drawn in subsequent calls.
+
+A simple example of code to draw one of the examples above is ::
+
+~~~
+// Put information about the scene camera and viewport
+dd_new_frame_info_t info = { 
+    .view_matrix       = view.data,
+    .projection_matrix = proj.data,
+    .viewport_size     = viewport.data,
+    .vertical_fov      = fovy,
+    .projection_type   = DBGDRAW_PERSPECTIVE };
+dd_new_frame( dd_ctx, &info );
+
+// Prepare some data
+vec3 x0 = vec3_negx(); vec3 x1 = vec3_posx();
+vec3 y0 = vec3_negy(); vec3 y1 = vec3_posy();
+vec3 z0 = vec3_negz(); vec3 z1 = vec3_posz();
+
+// Set primitive size - this will be interpreted as point size if drawing points and line width if drawing lines
+dd_set_primitive_size( dd_ctx, 1.0f );
+
+// Set transformation to be used when drawing the subsequent commands
+dd_set_transform( dd_ctx, model.data );
+
+// Let's begin drawing lines
+dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+
+// Draw axis
+dd_set_color( dd_ctx, DBGDRAW_RED );
+dd_line( dd_ctx, x0.data, x1.data );
+dd_set_color( dd_ctx, DBGDRAW_GREEN );
+dd_line( dd_ctx, y0.data, y1.data );
+dd_set_color( dd_ctx, DBGDRAW_BLUE );
+dd_line( dd_ctx, z0.data, z1.data );
+
+// Draw axis aligned bounding box
+dd_set_color( dd_ctx, DBGDRAW_GRAY );
+dd_aabb( dd_ctx, vec3( -1.1f, -1.1f, -1.1f ).data, vec3( 1.1f, 1.1f, 1.1f ).data );
+dd_end_cmd( dd_ctx );
+    
+dd_render( dd_ctx );
+~~~
+
+Note that all `dd_x` calls simply take pointer to float storage, so they should be agnostic to any vector library that you might use!
+(With the exception of dbgdraw expecting column major matrices )
+
+#### Memory
+
+TBA
+
+### API
+
+TBA
