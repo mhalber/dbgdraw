@@ -2,15 +2,14 @@
 
 ## dbgdraw
 
-dbgdraw is intended to be a small immediate mode library for putting simple graphics on the screen. Below
-you can see some examples of what can be achieved in dbgdraw.
+dbgdraw is intended to be a small immediate mode library for putting simple graphics on the screen. Below you can see some examples of what can be achieved in dbgdraw.
 
 ![Overview](images/overview.png)
 
 ### Features
 
-- Written in C99 with minimal, optional dependencies (c stdlib, stb_truetype.h )
-- Validation - optionally enable asserts that will inform users on api misuse
+- Written in C99 with minimal dependencies (c stdlib, stb_truetype.h [optional] )
+- Validation - optionally enable asserts that will inform users on common mistakes
 
 ### Current issues
 
@@ -19,11 +18,11 @@ you can see some examples of what can be achieved in dbgdraw.
 
 ### Usage
 
-dbgdraw is built around the familiar idea of context. To start drawing, one needs to initialize context using `dd_init`. Then on each frame some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the 'dd_new_frame' call. Similarly, at the end of the frame, user requests the content to be rendered using `dd_render`. Once application is finished, or context is no longer needed, it can be removed using `dd_term`.
+dbgdraw is built around a familiar idea of using contexts. To start drawing, one needs to initialize context using `dd_init`. Then on each frame some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the `dd_new_frame` call. Similarly, at the end of the frame, user requests the content to be rendered using `dd_render`. Once application is finished, or context is no longer needed, it can be removed using `dd_term`.
 
-Within each frame, user can begin issueing drawing commands. These need to be delimeted by the `dd_begin_cmd` and `dd_end_cmd`. Within, user can request any number of primitives to be drawn, using calls like `dd_line, `dd_sphere`, `dd_aabb`, and so on. There are number of state modifying functions of the form `dd_set_x` - for example `dd_set_color` will modify color of primitives drawn in subsequent calls.
+Within each frame, user can begin issuing drawing commands. These need to be delimited by the `dd_begin_cmd` and `dd_end_cmd`. Within, user can request any number of primitives to be drawn, using calls like `dd_line`, `dd_sphere`, `dd_aabb`, and so on. There are number of state modifying functions of the form `dd_set_x` - for example `dd_set_color` will modify color of primitives drawn in subsequent calls.
 
-A simple example of code to draw one of the examples above is ::
+A simple example of code to draw the examples first example in the above image is :
 
 ~~~
 // Put information about the scene camera and viewport
@@ -65,12 +64,19 @@ dd_end_cmd( dd_ctx );
 dd_render( dd_ctx );
 ~~~
 
-Note that all `dd_x` calls simply take pointer to float storage, so they should be agnostic to any vector library that you might use!
-(With the exception of dbgdraw expecting column major matrices )
+Note that all `dd_x` calls simply take pointer to float storage, so they should be agnostic to any vector library that you might use! (With the exception of dbgdraw expecting column major matrices )
 
 #### Memory
 
-TBA
+dbgdraw keeps two main memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init`. If during a frame user submits more commands / vertices than the initial size, the memory will be resized similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled. 
+
+By default memory allocations are done with `malloc`, `free` and `realloc`
+
+#### Building
+
+To use dbgdraw you can simply drop the `dbgdraw.h` into your application and add `#include "dbgdraw.h"` and `#define DBGDRAW_IMPLEMENTATION`. Optionally, there is also `dbgdraw.c` that you can add to your build if you wish recompilation of the dbgdraw library each time.
+
+As far examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now I opted to simply add build-system free scripts that simply call the complier directly. For more details, see the examples directory. I currently do not have mac machine at hand to test the building of these at hand - I welcome pull requests to add these!
 
 ### API
 
