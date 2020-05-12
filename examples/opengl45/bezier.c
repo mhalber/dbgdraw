@@ -323,6 +323,7 @@ void frame(app_state_t* state)
     if( bezier_pts_len > 1 ) idx = bezier_pts_len - 1;
     bezier_pts[ idx ] = quartic_interpolation_pts( control_pts[0], control_pts[1], control_pts[2], control_pts[3], control_pts[4], t );
     
+    dd_set_fill_type(dd_ctx, DBGDRAW_FILL_FLAT);
     float r = 2.0f;
     draw_line_segments( dd_ctx, bezier_pts, bezier_pts_len, DBGDRAW_LIGHT_PURPLE, r * 2.0f );
     
@@ -341,28 +342,6 @@ void frame(app_state_t* state)
     
     draw_labeled_points( dd_ctx, control_pts, control_pts_labels, NPTS,
                         DBGDRAW_LIGHT_GRAY, DBGDRAW_GRAY, DBGDRAW_BLACK, 5.0f );
-    
-    float center[2] = {128.0f, 128.0f};
-    float pt_a[2] = {128.0f, 128.0f};
-    float pt_b[2] = {128.0f + 32.0f, 128.0f + 64.0f};
-    dd_ctx->detail_level = 4;
-    dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
-    dd_circle2d(dd_ctx, center, 32.0f);
-    dd_set_color(dd_ctx, DBGDRAW_LIGHT_BLUE);
-    dd_rect2d(dd_ctx, pt_a, pt_b);
-    
-    pt_a[0] = 356.0f; pt_b[0] = pt_a[0] + 64.0f;
-    pt_a[1] = 156.0f; pt_b[1] = pt_a[1] + 136.0f;
-    dd_set_color(dd_ctx, DBGDRAW_RED);
-    dd_rounded_rect2d(dd_ctx, pt_a, pt_b, 16.0f);
-    dd_end_cmd(dd_ctx);
-    
-    dd_set_primitive_size(dd_ctx, 12.0f);
-    dd_begin_cmd(dd_ctx, DBGDRAW_MODE_STROKE);
-    dd_set_color(dd_ctx, DBGDRAW_LIGHT_RED);
-    dd_rounded_rect2d(dd_ctx, pt_a, pt_b, 16.0f);
-    dd_line2d(dd_ctx, pt_a, pt_b);
-    dd_end_cmd(dd_ctx);
     
     dd_render( dd_ctx );
 }

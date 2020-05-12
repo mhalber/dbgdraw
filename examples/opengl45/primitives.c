@@ -174,11 +174,12 @@ init( app_state_t* state )
     }
     
     state->camera = calloc( 1, sizeof(msh_camera_t) );
-    msh_camera_init( state->camera, &(msh_camera_desc_t){ .eye       = msh_vec3( -3, 3.5, -8 ),
+    msh_camera_init(state->camera, &(msh_camera_desc_t){ 
+                        .eye       = msh_vec3( -3.0f, 3.5f, -8.0f ),
                         .center    = msh_vec3_zeros(),
                         .up        = msh_vec3_posy(),
-                        .viewport  = msh_vec4( 0, 0, win_width, win_height ),
-                        .fovy      = msh_rad2deg( 60.0f ),
+                        .viewport  = msh_vec4( 0, 0, (float)win_width, (float)win_height ),
+                        .fovy      = (float)msh_rad2deg( 60.0f ),
                         .znear     = 0.01f,
                         .zfar      = 100.0f,
                         .use_ortho = false } );
@@ -219,8 +220,8 @@ frame( app_state_t* state )
     input.prev_xpos = input.cur_xpos;
     input.prev_ypos = input.cur_ypos;
     glfwGetCursorPos( window, &input.cur_xpos, &input.cur_ypos );
-    msh_vec2_t scrn_p0 = msh_vec2( input.prev_xpos, input.prev_ypos );
-    msh_vec2_t scrn_p1 = msh_vec2( input.cur_xpos, input.cur_ypos );
+    msh_vec2_t scrn_p0 = msh_vec2( (float)input.prev_xpos, (float)input.prev_ypos );
+    msh_vec2_t scrn_p1 = msh_vec2( (float)input.cur_xpos, (float)input.cur_ypos );
     
     if( input.mouse_buttons[GLFW_MOUSE_BUTTON_1] )
     {
@@ -244,10 +245,10 @@ frame( app_state_t* state )
     
     if( win_width != cam->viewport.z || win_height != cam->viewport.w )
     {
-        cam->viewport.z = win_width;
-        cam->viewport.w = win_height;
+        cam->viewport.z = (float)win_width;
+        cam->viewport.w = (float)win_height;
         msh_camera_update_proj( cam );
-        glViewport( cam->viewport.x, cam->viewport.y, cam->viewport.z, cam->viewport.w );
+        glViewport( (GLint)cam->viewport.x, (GLint)cam->viewport.y, (GLint)cam->viewport.z, (GLint)cam->viewport.w );
     }
     
     static int32_t show_lines   = 0;
@@ -255,7 +256,7 @@ frame( app_state_t* state )
     static int32_t show_points  = 0;
     static int32_t shading_mode = (int32_t)DBGDRAW_SHADING_NONE;
     static int32_t show_overlay = 1;
-    static int32_t detail_lvl   = 2;
+    static uint8_t detail_lvl   = 2;
     if( input.keyboard[GLFW_KEY_1] ) { show_points  = !show_points;  input.keyboard[GLFW_KEY_1] = 0; }
     if( input.keyboard[GLFW_KEY_2] ) { show_lines   = !show_lines;   input.keyboard[GLFW_KEY_2] = 0; }
     if( input.keyboard[GLFW_KEY_3] ) { show_solid   = !show_solid;   input.keyboard[GLFW_KEY_3] = 0; }
@@ -286,7 +287,7 @@ frame( app_state_t* state )
     msh_vec3_t p0           = msh_vec3(  0.0f, -0.5f,  0.0f );
     msh_vec3_t p1           = msh_vec3(  0.0f,  0.5f,  0.0f );
     msh_vec3_t cur_loc      = msh_vec3(  0.0f,  0.0f,  0.0f );
-    msh_mat4_t proj         = msh_perspective( msh_deg2rad(45.0f), 4.0f / 3.0f, 0.5f, 1.5f );
+    msh_mat4_t proj         = msh_perspective( (float)msh_deg2rad(45.0f), 4.0f / 3.0f, 0.5f, 1.5f );
     msh_mat4_t view         = msh_mat4_identity();
     dt1 = msh_time_now();
     
@@ -349,7 +350,7 @@ frame( app_state_t* state )
         
         cur_loc = msh_vec3( -1, 0, -2 );
         dd_set_color( primitives, *color );
-        dd_arc( primitives, cur_loc.data, 0.5f, MSH_TWO_PI * 0.8 );
+        dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI * 0.8f );
         
         cur_loc = msh_vec3( 1, 0, -2 );
         dd_set_color( primitives, *color );
@@ -385,11 +386,11 @@ frame( app_state_t* state )
     if( show_overlay )
     {
         msh_vec3_t cam_pos = msh_vec3( 0, 0, 5 );
-        proj = msh_ortho( 0, win_width, 0, win_height, 0.01, 100.0 );
+        proj = msh_ortho( 0.0f, (float)win_width, 0.0f, (float)win_height, 0.01f, 100.0f );
         view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
         info.view_matrix       = view.data;
         info.projection_matrix = proj.data;
-        info.vertical_fov      = win_height;
+        info.vertical_fov      = (float)win_height;
         info.projection_type   = DBGDRAW_ORTHOGRAPHIC;
         dd_new_frame( overlay, &info );
         
