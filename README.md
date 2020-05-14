@@ -64,20 +64,31 @@ dd_end_cmd( dd_ctx );
 dd_render( dd_ctx );
 ~~~
 
-Note that all `dd_x` calls simply take pointer to float storage, so they should be agnostic to any vector library that you might use! (With the exception of dbgdraw expecting column major matrices )
+Note that all `dd_<xyz>` calls simply take pointer to float data, so they should be agnostic to any vector library that you might use! (With the exception of dbgdraw expecting column major matrices )
 
 #### Memory
 
 dbgdraw keeps two main memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init`. If during a frame user submits more commands / vertices than the initial size, the memory will be resized similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled. 
 
-By default memory allocations are done with `malloc`, `free` and `realloc`
+By default memory allocations are done with `malloc`, `free` and `realloc`. These defaults can be changed by redefining following symbols `DBGDRAW_MALLOC(size)`, `DBGDRAW_FREE(ptr)`, `DBGDRAW_REALLOC(ptr, size)`. This way one can use their own specific allocators.
+
+Additionally there is a macro that controls the out-of-memory behaviour. By redefining `DBGDRAW_HANDLE_OUT_OF_MEMORY(ptr, len, cap, elemsize)` one can
+specify different behavour to the growing described above. For example if you want the application to simply stop accepting commands if there is no more memory in the initial allocation, you could do the following:
+~~~
+#define DBGDRAW_HANDLE_OUT_OF_MEMORY(ptr, len, cap, elemsize)     \
+  do                                                              \
+  {                                                               \
+    if (len >= cap)                                               \
+    {                                                             \
+      return DBGDRAW_ERR_OUT_OF_MEMORY;                           \
+    }                                                             \
+  } while (0)
+~~~
+The above will cause all function that fill the buffer to exit early with out of memory error that the client side might
+choose to deal with in whichever way they choose.
 
 #### Building
 
-To use dbgdraw you can simply drop the `dbgdraw.h` into your application and add `#include "dbgdraw.h"` and `#define DBGDRAW_IMPLEMENTATION`. Optionally, there is also `dbgdraw.c` that you can add to your build if you wish recompilation of the dbgdraw library each time.
+To use dbgdraw you can simply drop the `dbgdraw.h` into your application source tree and add `#define DBGDRAW_IMPLEMENTATION` and `#include "dbgdraw.h"`. Optionally, there is also `dbgdraw.c` that you can add to your build, if you wish to avoid the recompilation of the dbgdraw library each time.
 
-As far examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now I opted to simply add build-system free scripts that simply call the complier directly. For more details, see the examples directory. I currently do not have mac machine at hand to test the building of these at hand - I welcome pull requests to add these!
-
-### API
-
-TBA
+As far examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now I opted to simply add build-system-free scripts that simply call the complier directly. For more details, see the examples directory. I currently do not have macos machine at hand to test the building of these at hand - I welcome pull requests to add these!

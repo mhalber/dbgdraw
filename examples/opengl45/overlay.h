@@ -18,9 +18,9 @@ draw_legend( dd_ctx_t* ctx, char* legend_string, int32_t x, int32_t y )
         *end = 0;
         
         error = dd_set_color( ctx, DBGDRAW_WHITE );
-        if( error ) { return error; }
+        if( error ) { dd_end_cmd(ctx); return error; }
         error = dd_text( ctx, msh_vec3( px, py, 0.0).data, start, &info );
-        if( error ) { return error; }
+        if( error ) { dd_end_cmd(ctx); return error; }
         py -= (info.height + 4);
         
         *end = tmp;

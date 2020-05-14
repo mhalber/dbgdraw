@@ -153,8 +153,9 @@ init( app_state_t* state )
     state->overlay = calloc( 1, sizeof(dd_ctx_t) );
     dd_ctx_desc_t desc_overlay = 
     { 
-        .max_vertices = 64,
+        .max_vertices = 32,
         .max_commands = 16,
+        .detail_level = 2,
         .enable_frustum_cull = false,
         .enable_depth_test = false
     };
@@ -206,10 +207,10 @@ frame( app_state_t* state )
     uint64_t dt1, dt2;
     dt1 = msh_time_now();
     
-    GLFWwindow*    window     = state->window;
-    dd_ctx_t* primitives = state->primitives;
-    dd_ctx_t* overlay    = state->overlay;
-    msh_camera_t*  cam        = state->camera;
+    GLFWwindow*    window   = state->window;
+    dd_ctx_t* primitives    = state->primitives;
+    dd_ctx_t* overlay       = state->overlay;
+    msh_camera_t*  cam      = state->camera;
     
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     glClearColor( 0.2f, 0.2f, 0.2f, 1.0f );
@@ -378,7 +379,6 @@ frame( app_state_t* state )
         dd_arrow( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.3f, 0.45f, 0.25f );
         
         dd_end_cmd( primitives );
-        
     }
     
     dd_render( primitives );
