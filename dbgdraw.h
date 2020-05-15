@@ -213,7 +213,6 @@ int32_t dd_init_font_from_file(dd_ctx_t *ctx, const char *font_path,
 
 // Utilities
 void dd_extract_frustum_planes(dd_ctx_t *ctx);
-void dd_sort_commands(dd_ctx_t *ctx);
 char *dd_error_message(int32_t error_code);
 dd_color_t dd_hex2color(uint32_t hex_code);
 dd_color_t dd_rgbf(float r, float g, float b);
@@ -222,7 +221,7 @@ dd_color_t dd_rgbu(uint8_t r, uint8_t g, uint8_t b);
 dd_color_t dd_rgbau(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 dd_color_t dd_interpolate_color(dd_color_t c0, dd_color_t c1, float t);
 
-// User provides implementation for these - see examples for implementations of these
+// User provides implementation for these - see examples for reference implementation
 int32_t dd_backend_init(dd_ctx_t *ctx);
 int32_t dd_backend_render(dd_ctx_t *ctx);
 int32_t dd_backend_term(dd_ctx_t *ctx);
@@ -812,15 +811,6 @@ void dd_sort_commands(dd_ctx_t *ctx)
   if (ctx->commands_len)
   {
     qsort(ctx->commands, ctx->commands_len, sizeof(ctx->commands[0]), dd__cmd_cmp);
-#if 0
-        const char* strings[3] = {"Point", "Line", "Triangle"};
-        for( int32_t i = 0 ; i < ctx->commands_len; ++i )
-        {
-            float key = (float)(ctx->commands[i].draw_mode << 20) + ctx->commands[i].min_depth;
-            printf("%d %s %f %f\n", i, strings[ctx->commands[i].draw_mode], ctx->commands[i].min_depth, key );
-        }
-        printf("-----------\n");
-#endif
   }
 }
 

@@ -13,18 +13,31 @@ dbgdraw is intended to be a small immediate mode library for putting simple grap
 
 ### Current issues
 
-- No full UTF-8 support, just latin + greek character ranges
-- Only backend is OpenGL 4.5
+- No full UTF-8 support, just Latin + Greek character ranges
+- The only backend is OpenGL 4.5
 
 ### Usage
 
-dbgdraw is built around a familiar idea of using contexts. To start drawing, one needs to initialize context using `dd_init`. Then on each frame some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the `dd_new_frame` call. Similarly, at the end of the frame, user requests the content to be rendered using `dd_render`. Once application is finished, or context is no longer needed, it can be removed using `dd_term`.
+To start drawing, one needs to initialize the *dbgdraw* context using `dd_init` function. Then on each frame, some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the `dd_new_frame` call. Similarly, at the end of the frame, the user requests the content to be rendered using `dd_render`. Once the application is finished, or context is no longer needed, it can be removed using `dd_term`.
 
-Within each frame, user can begin issuing drawing commands. These need to be delimited by the `dd_begin_cmd` and `dd_end_cmd`. Within, user can request any number of primitives to be drawn, using calls like `dd_line`, `dd_sphere`, `dd_aabb`, and so on. There are number of state modifying functions of the form `dd_set_x` - for example `dd_set_color` will modify color of primitives drawn in subsequent calls.
+Within each frame, the user can begin issuing drawing commands. These need to be surrounded by the `dd_begin_cmd` and `dd_end_cmd`. Within, the user can request any number of primitives to be drawn, using calls like `dd_line`, `dd_sphere`, `dd_aabb`, and so on. There exist a number of state modifying functions of the form `dd_set_x`. For example, `dd_set_color` will modify the color of primitives drawn in subsequent calls.
 
-A simple example of code to draw the examples first example in the above image is :
+Code to draw the first example in the above image is :
 
 ~~~
+/* Initialization time */
+dd_ctx_t* dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+dd_ctx_desc_t desc = 
+{ 
+  .max_vertices = 1024,
+  .max_commands = 16,
+  .detail_level = 2,
+  .enable_frustum_cull = false,
+  .enable_depth_test = true 
+};
+dd_init( dd_ctx, &desc );
+
+/* Frame time */
 // Put information about the scene camera and viewport
 dd_new_frame_info_t info = { 
     .view_matrix       = view.data,
@@ -64,16 +77,14 @@ dd_end_cmd( dd_ctx );
 dd_render( dd_ctx );
 ~~~
 
-Note that all `dd_<xyz>` calls simply take pointer to float data, so they should be agnostic to any vector library that you might use! (With the exception of dbgdraw expecting column major matrices )
+Note, that all of the `dd_<xyz>` calls take a pointer to float data, so they should be agnostic to any vector library that you might use! (Except for dbgdraw expecting column-major matrices)
 
 #### Memory
+dbgdraw maintains two memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init(...)`. If the user ever submits more commands/vertices than the amount specified at the initialization time, the memory will be automatically resized. This is done similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled. 
 
-dbgdraw keeps two main memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init`. If during a frame user submits more commands / vertices than the initial size, the memory will be resized similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled. 
+By default memory allocations are done with `malloc`, `free`, and `realloc`. These defaults can be changed by defining the following macros, before including 'dbgdraw.h': `DBGDRAW_MALLOC(size)`, `DBGDRAW_FREE(ptr)`, `DBGDRAW_REALLOC(ptr, size)`. This way the user can use their own allocators.
 
-By default memory allocations are done with `malloc`, `free` and `realloc`. These defaults can be changed by redefining following symbols `DBGDRAW_MALLOC(size)`, `DBGDRAW_FREE(ptr)`, `DBGDRAW_REALLOC(ptr, size)`. This way one can use their own specific allocators.
-
-Additionally there is a macro that controls the out-of-memory behaviour. By redefining `DBGDRAW_HANDLE_OUT_OF_MEMORY(ptr, len, cap, elemsize)` one can
-specify different behavour to the growing described above. For example if you want the application to simply stop accepting commands if there is no more memory in the initial allocation, you could do the following:
+Additionally, there is a macro that controls out-of-memory behavior. By redefining `DBGDRAW_HANDLE_OUT_OF_MEMORY(ptr, len, cap, elemsize)` the user can specify different behavior to the growing described above. For example, if you want the application to simply stop accepting commands, if there is no more memory in the initial allocation, you could do the following:
 ~~~
 #define DBGDRAW_HANDLE_OUT_OF_MEMORY(ptr, len, cap, elemsize)     \
   do                                                              \
@@ -84,11 +95,10 @@ specify different behavour to the growing described above. For example if you wa
     }                                                             \
   } while (0)
 ~~~
-The above will cause all function that fill the buffer to exit early with out of memory error that the client side might
-choose to deal with in whichever way they choose.
+The above code will cause all function that fill-in the buffer to exit early with out of memory error that the client-side might choose to deal with in whichever way they choose.
 
 #### Building
 
-To use dbgdraw you can simply drop the `dbgdraw.h` into your application source tree and add `#define DBGDRAW_IMPLEMENTATION` and `#include "dbgdraw.h"`. Optionally, there is also `dbgdraw.c` that you can add to your build, if you wish to avoid the recompilation of the dbgdraw library each time.
+To use dbgdraw you can simply drop the `dbgdraw.h` into your application source tree and add `#define DBGDRAW_IMPLEMENTATION` and `#include "dbgdraw.h"`. Optionally, there is also `dbgdraw.c` that you can add to your build if you wish to avoid the recompilation of the dbgdraw library each time.
 
-As far examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now I opted to simply add build-system-free scripts that simply call the complier directly. For more details, see the examples directory. I currently do not have macos machine at hand to test the building of these at hand - I welcome pull requests to add these!
+As far as examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now, I have opted to simply add build-system-free scripts that simply call the compiler directly. For more details, see the examples directory. I currently do not have macros machine at hand to test the building of these at hand - I welcome pull requests to add these!
