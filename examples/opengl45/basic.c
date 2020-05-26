@@ -77,7 +77,7 @@ int32_t init( app_state_t* state ) {
   state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
   dd_ctx_desc_t desc = 
   { 
-    .max_vertices = 1024,
+    .max_vertices = 32,
     .max_commands = 16,
     .detail_level = 2,
     .enable_frustum_cull = false,
