@@ -9,7 +9,7 @@ dbgdraw is intended to be a small immediate mode library for putting simple grap
 ### Features
 
 - Written in C99 with minimal dependencies (c stdlib, stb_truetype.h [optional] )
-- Validation - optionally enable asserts that will inform users on common mistakes
+- Validation - user can enable API validation checks 
 
 ### Current issues
 

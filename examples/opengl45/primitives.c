@@ -5,6 +5,7 @@ static const char *PROGRAM_NAME = "dbgdraw_primitives.c";
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define MSH_CAMERA_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
+#define DBGDRAW_USE_DEFAULT_FONT
 #define DBGDRAW_VALIDATION_LAYERS
 
 #include "msh_std.h"
@@ -25,7 +26,6 @@ typedef struct {
     msh_camera_t* camera;
     dd_ctx_t* primitives;
     dd_ctx_t* overlay;
-    int32_t proggy_square_font;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -157,20 +157,13 @@ init( app_state_t* state )
         .max_commands = 16,
         .detail_level = 2,
         .enable_frustum_cull = false,
-        .enable_depth_test = false
+        .enable_depth_test = false,
+        .enable_default_font = true
     };
     error = dd_init( state->overlay, &desc_overlay );
     if( error )
     {
         fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
-        return 1;
-    }
-    
-    error = dd_init_font_from_file( state->overlay, "examples/fonts/ProggySquare.ttf", 11, 512, 512,
-                                   &state->proggy_square_font );
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to read font\n" );
         return 1;
     }
     
