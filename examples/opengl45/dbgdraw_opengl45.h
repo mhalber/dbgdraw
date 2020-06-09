@@ -1,19 +1,19 @@
 #ifndef DBGDRAW_OPENGL45_H
 #define DBGDRAW_OPENGL45_H
 
-//TODO(maciej): Don't do bindless, they don't work on Intel
-
 typedef struct dd_render_backend
 {
   GLuint base_program;
   GLuint lines_program;
   GLuint vao;
   GLuint vbo;
+  GLuint ibo;
   GLuint font_tex_attrib_loc;
   GLuint font_tex_ids[16];
 
   GLuint line_data_texture_id;
   size_t vbo_size;
+  size_t ibo_size;
 } dd_render_backend_t;
 
 void dd__gl_check(const char *filename, uint32_t lineno)
@@ -155,9 +155,12 @@ dd_backend_init(dd_ctx_t *ctx)
   GLCHECK(glCreateVertexArrays(1, &backend.vao));
 
   GLCHECK(glCreateBuffers(1, &backend.vbo));
+  GLCHECK(glCreateBuffers(1, &backend.ibo));
 
   backend.vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
   GLCHECK(glNamedBufferData(backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW));
+  backend.ibo_size = 128 * sizeof(dd_vec3_t);
+  GLCHECK(glNamedBufferData(backend.ibo, backend.ibo_size, NULL, GL_DYNAMIC_DRAW));
 
   GLCHECK(glCreateTextures(GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id));
   GLCHECK(glTextureBuffer(backend.line_data_texture_id, GL_RGBA32F, backend.vbo));
@@ -166,6 +169,10 @@ dd_backend_init(dd_ctx_t *ctx)
   GLuint pos_size_loc = glGetAttribLocation(backend.base_program, "in_position_and_size");
   GLuint uv_or_normal_loc = glGetAttribLocation(backend.base_program, "in_uv_or_normal");
   GLuint color_loc = glGetAttribLocation(backend.base_program, "in_color");
+
+  GLuint instance_pos_loc = glGetAttribLocation(backend.base_program, "in_instance_pos");
+  GLuint instance_col_loc = glGetAttribLocation(backend.base_program, "in_instance_col");
+
 
   GLCHECK(glVertexArrayVertexBuffer(backend.vao, bind_idx, backend.vbo, 0, sizeof(dd_vertex_t)));
 
@@ -180,6 +187,20 @@ dd_backend_init(dd_ctx_t *ctx)
   GLCHECK(glVertexArrayAttribBinding(backend.vao, pos_size_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, uv_or_normal_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, color_loc, bind_idx));
+
+  bind_idx += 1;
+  GLCHECK(glVertexArrayVertexBuffer(backend.vao, bind_idx, backend.ibo, 0, sizeof(dd_instance_data_t)));
+
+  GLCHECK(glEnableVertexArrayAttrib(backend.vao, instance_pos_loc));
+  GLCHECK(glEnableVertexArrayAttrib(backend.vao, instance_col_loc));
+
+  GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_pos_loc, 3, GL_FLOAT, GL_FALSE, offsetof(dd_instance_data_t, position)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_col_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(dd_instance_data_t, color)));
+  
+  GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_pos_loc, bind_idx));
+  GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_col_loc, bind_idx));
+  
+  GLCHECK(glVertexArrayBindingDivisor(backend.vao, bind_idx, 1));
 
   return DBGDRAW_ERR_OK;
 }
@@ -201,7 +222,6 @@ dd_backend_render(dd_ctx_t *ctx)
   GLCHECK(glNamedBufferSubData(ctx->backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data));
 
   // Setup required ogl state
-  // TODO(maciej): Rethink how commands are drawn --> sorting breaks 2d draws, since we do not do any depth testing
   if (ctx->enable_depth_test)
   {
     GLCHECK(glEnable(GL_DEPTH_TEST));
@@ -226,11 +246,22 @@ dd_backend_render(dd_ctx_t *ctx)
     dd_cmd_t *cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, cmd->xform));
 
+    if (cmd->instance_count && cmd->instance_data)
+    {
+      if (ctx->backend->ibo_size < cmd->instance_count * sizeof(dd_instance_data_t))
+      {
+        ctx->backend->ibo_size = cmd->instance_count * sizeof(dd_instance_data_t);
+        GLCHECK(glNamedBufferData(ctx->backend->ibo, ctx->backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
+      }
+      GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, cmd->instance_count * sizeof(dd_instance_data_t), cmd->instance_data));
+    }
+
     if (cmd->draw_mode == DBGDRAW_MODE_FILL)
     {
       GLCHECK(glUseProgram(ctx->backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, cmd->shading_type));
+      // GLCHECK(glUniform)
 #if DBGDRAW_HAS_TEXT_SUPPORT
       if (cmd->font_idx >= 0)
       {
@@ -239,8 +270,14 @@ dd_backend_render(dd_ctx_t *ctx)
         glUniform1i(ctx->backend->font_tex_attrib_loc, 0);
       }
 #endif
-      GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
-      GLCHECK(glPolygonOffset(0.0, 0.0));
+      if (cmd->instance_count <= 0)
+      {
+        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
+      }
+      else
+      {
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count ));
+      }
     }
 
     else if (cmd->draw_mode == DBGDRAW_MODE_POINT)
@@ -249,7 +286,14 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, 0));
 
-      GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
+      if (cmd->instance_count <= 0)
+      {
+        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
+      }
+      else
+      {
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count ));
+      }
     }
 
     else
@@ -266,7 +310,14 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUniform2i(4, cmd->base_index, cmd->vertex_count));
 
       // For tex buffer lines vbo does not matter.
-      GLCHECK(glDrawArrays(GL_TRIANGLES, 0, 3 * cmd->vertex_count));
+      if (cmd->instance_count <= 0)
+      {
+        GLCHECK(glDrawArrays(GL_TRIANGLES, 0, 3 * cmd->vertex_count));
+      }
+      else
+      {
+        GLCHECK(glDrawArraysInstanced(GL_TRIANGLES, 0, 3 * cmd->vertex_count, cmd->instance_count ));
+      }
     }
   }
 
@@ -330,13 +381,15 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
       layout(location = 0) in vec4 in_position_and_size;
       layout(location = 1) in vec3 in_uv_or_normal;
       layout(location = 2) in vec4 in_color;
-
+      layout(location = 3) in vec3 in_instance_pos;
+      layout(location = 4) in vec4 in_instance_col;
+      
       layout(location = 0) out vec4 v_color;
       layout(location = 1) out vec3 v_uv_or_normal;
       layout(location = 2) out flat int v_shading_type;
 
       void main() {
-        v_color = in_color;
+        v_color = in_color + in_instance_col;
         if (shading_type == 0)
         {
           v_uv_or_normal = in_uv_or_normal;
@@ -346,7 +399,7 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
           v_uv_or_normal = vec3(u_mvp * vec4(in_uv_or_normal, 0.0));
         }
         v_shading_type = shading_type;
-        gl_Position = u_mvp * vec4(in_position_and_size.xyz, 1.0);
+        gl_Position = u_mvp * vec4(in_position_and_size.xyz + in_instance_pos, 1.0);
         gl_PointSize = in_position_and_size.w;
       });
 
@@ -380,6 +433,9 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
   *vert_shdr_src =
     DBGDRAW_SHADER_HEADER
     DBGDRAW_STRINGIFY(
+
+      layout(location = 3) in vec3 in_instance_pos;
+      layout(location = 4) in vec4 in_instance_col;
 
       layout(location = 0) uniform mat4 u_mvp;
       layout(location = 1) uniform vec2 u_viewport_size;
@@ -445,6 +501,13 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
           pos_width[4] = get_vertex_position(line_ids_2[0], u_line_data_sampler);
           pos_width[5] = get_vertex_position(line_ids_2[1], u_line_data_sampler);
         }
+
+        pos_width[0] = pos_width[0] + vec4(in_instance_pos, 0.0);
+        pos_width[1] = pos_width[1] + vec4(in_instance_pos, 0.0);
+        pos_width[2] = pos_width[2] + vec4(in_instance_pos, 0.0);
+        pos_width[3] = pos_width[3] + vec4(in_instance_pos, 0.0);
+        pos_width[4] = pos_width[4] + vec4(in_instance_pos, 0.0);
+        pos_width[5] = pos_width[5] + vec4(in_instance_pos, 0.0);
 
         vec4 clip_pos[6];
         clip_pos[0] = u_mvp * vec4(pos_width[0].xyz, 1.0);
@@ -553,7 +616,9 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
 
         vec4 color[2];
         color[0] = get_vertex_color(line_ids_1[0] + 1, u_line_data_sampler);
+        color[0] += in_instance_col;
         color[1] = get_vertex_color(line_ids_1[1] + 1, u_line_data_sampler);
+        color[1] += in_instance_col;
 
         v_col = color[quad_pos.x];
         v_col.a = min(pos_width[2 + quad_pos.x].w * v_col.a, 1.0f);

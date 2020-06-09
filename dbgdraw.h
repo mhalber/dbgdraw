@@ -23,9 +23,9 @@ extern "C"
 {
 #endif
 
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Configuration
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Configuration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __STB_INCLUDE_STB_TRUETYPE_H__
 #define DBGDRAW_HAS_TEXT_SUPPORT 1
@@ -77,9 +77,9 @@ extern "C"
 #if defined(DBGDRAW_SIN) && defined(DBGDRAW_COS) && defined(DBGDRAW_FABS) && defined(DBGDRAW_ROUND)
   // all good
 #elif !defined(DBGDRAW_SIN) && !defined(DBGDRAW_COS) && !defined(DBGDRAW_FABS) && !defined(DBGDRAW_ROUND)
-// all good
+  // all good
 #else
-#error "If you redefined any of 'sin', 'cos', 'fabs' or 'round' functions, please redefine all of them"
+  #error "If you redefined any of 'sin', 'cos', 'fabs' or 'round' functions, please redefine all of them"
 #endif
 
 #ifndef DBGDRAW_SIN
@@ -122,7 +122,6 @@ extern "C"
 
 #include <stdint.h>
 #include <stdbool.h>
-  #include <immintrin.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Forward declares and required structs / enums
@@ -167,6 +166,7 @@ typedef enum dd_projection_type
 typedef struct dd_context_desc dd_ctx_desc_t;
 typedef struct dd_new_frame_info dd_new_frame_info_t;
 typedef struct dd_ctx_t dd_ctx_t;
+typedef struct dd_instance_data dd_instance_data_t;
 #if DBGDRAW_HAS_TEXT_SUPPORT
 typedef struct dd_text_info dd_text_info_t;
 #endif
@@ -248,9 +248,12 @@ dd_color_t  dd_rgbf(float r, float g, float b);
 dd_color_t  dd_rgbaf(float r, float g, float b, float a);
 dd_color_t  dd_rgbu(uint8_t r, uint8_t g, uint8_t b);
 dd_color_t  dd_rgbau(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+dd_color_t  dd_hsl(float hue_degres, float saturation, float lightness);
 dd_color_t  dd_interpolate_color(dd_color_t c0, dd_color_t c1, float t);
 void        dd_extract_frustum_planes(dd_ctx_t *ctx);
 const char* dd_error_message(int32_t error_code);
+int32_t     dd_set_instance_data(dd_ctx_t* ctx, int32_t instance_count, dd_instance_data_t* data);
+
 
 // User provides implementation for these - see examples for reference implementation
 int32_t dd_backend_init(dd_ctx_t *ctx);
@@ -503,6 +506,14 @@ typedef struct dd_new_frame_info
   uint8_t projection_type;
 } dd_new_frame_info_t;
 
+typedef struct dd_instance_data
+{
+  /* TODO(maciej): dd_vec4_t quat; */
+  dd_vec3_t position;
+  /* TODO(maciej): float size; */
+  dd_color_t color;
+} dd_instance_data_t;
+
 typedef struct dd_vertex
 {
   union {
@@ -528,6 +539,9 @@ typedef struct dd_cmd_t
 {
   int32_t base_index;
   int32_t vertex_count;
+  int32_t instance_count;
+
+  dd_instance_data_t* instance_data;
 
   dd_mat4_t xform;
   float min_depth;
@@ -788,6 +802,31 @@ dd_rgbau(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 }
 
 dd_color_t
+dd_hsl( float hue, float saturation, float light)
+{
+  float chroma = (1.0f - fabsf(2.0f*light-1.0f)) * saturation;
+  float hue_prime = hue / 60.0f;
+  int hue_prime_int = (int)ceilf(hue_prime);
+  float x =  chroma *fabsf(hue_prime_int%2 + (hue_prime-floorf(hue_prime)) - 1.0f) ;
+  dd_color_t color;
+  switch(hue_prime_int)
+  {
+    case 1: color = dd_rgbf(chroma, x, 0); break;
+    case 2: color = dd_rgbf(x, chroma, 0); break;
+    case 3: color = dd_rgbf(0, chroma, x); break;
+    case 4: color = dd_rgbf(0, x, chroma); break;
+    case 5: color = dd_rgbf(x, 0, chroma); break;
+    case 6: color = dd_rgbf(chroma, 0, x); break;
+    default: color = dd_rgbf(0,0,0); 
+  }
+  float m = light - chroma / 2.0f;
+  color.r += (uint8_t)(m * 255);
+  color.g += (uint8_t)(m * 255);
+  color.b += (uint8_t)(m * 255);
+  return color;
+}
+
+dd_color_t
 dd_interpolate_color(dd_color_t c0, dd_color_t c1, float t)
 {
   dd_color_t retcol;
@@ -890,6 +929,16 @@ dd_begin_cmd(dd_ctx_t *ctx, dd_mode_t draw_mode)
   ctx->cur_cmd->font_idx = -1;
 #endif
 
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_instance_data(dd_ctx_t* ctx, int32_t instance_count, dd_instance_data_t* data)
+{
+  DBGDRAW_ASSERT(ctx);
+  DBGDRAW_VALIDATE(ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD);
+  ctx->cur_cmd->instance_count = instance_count;
+  ctx->cur_cmd->instance_data = data;
   return DBGDRAW_ERR_OK;
 }
 
@@ -1409,8 +1458,9 @@ void dd__arc_point(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, 
 
 void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, int32_t resolution)
 {
-  float d_theta = theta / resolution;
   int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
+  int32_t mod = full_circle ? -1 : 0;
+  float d_theta = theta / (resolution + mod);
 
   dd_vec3_t pt_a = dd_vec3(center->x, center->y, center->z);
   dd_vec3_t pt_b = dd_vec3(center->x, center->y + radius, center->z);
@@ -1445,6 +1495,23 @@ void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta,
     pt_b.x = center->x + ox2;
     pt_b.y = center->y + oy2;
     dd__line(ctx, &pt_b, &pt_a);
+  }
+  else
+  {
+    /* This is an ugly fix, where we already added an extra line segment to simulated closes circle. 
+       Now we want to move joint point to be on the straight segment and not on the curve. 
+       Also avoids overlap. */
+    dd_vertex_t* v1 = ctx->verts_data + ctx->cur_cmd->base_index;
+    dd_vertex_t* v2 = v1 + 1;
+    dd_vec3_t p1 = v1->pos;
+    dd_vec3_t p2 = v2->pos;
+    v1->pos = dd_vec3(0.5f*(p1.x+p2.x),0.5f*(p1.y+p2.y),0.5f*(p1.z+p2.z));
+
+    v1 = ctx->verts_data + ctx->cur_cmd->base_index + ctx->cur_cmd->vertex_count - 2;
+    v2 = v1 + 1;
+    p1 = v1->pos;
+    p2 = v2->pos;
+    v2->pos = dd_vec3(0.5f*(p1.x+p2.x),0.5f*(p1.y+p2.y),0.5f*(p1.z+p2.z));
   }
 }
 
@@ -2288,6 +2355,7 @@ dd__circle_ex(dd_ctx_t *ctx, float *center, float radius, uint8_t is_3d)
   DBGDRAW_ASSERT(center);
 
   int32_t resolution = 1 << (ctx->detail_level + 2);
+  if ( ctx->cur_cmd->draw_mode == DBGDRAW_MODE_STROKE ) { resolution += 1; }
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT] = resolution;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 2 * resolution;
@@ -2951,9 +3019,8 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   dd_vec2_t uv_a, uv_b, uv_c;
   for (int32_t i = 0; i < n_chars; ++i)
   {
-    uint32_t cp = *str++ - 32;
-    // str++;
-    // str = dd__decode_char_incorrect(str, &cp);
+    uint32_t cp = 0;
+    str = dd__decode_char_incorrect(str, &cp);
 
     stbtt_aligned_quad q;
     stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, &x, &y, &q, 0);
