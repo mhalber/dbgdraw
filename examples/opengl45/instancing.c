@@ -5,6 +5,7 @@ static const char *PROGRAM_NAME = "dbgdraw_instancing";
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
 
+#include "stb_truetype.h"
 #include "msh_std.h"
 #include "msh_vec_math.h"
 #include "dbgdraw.h"
@@ -29,13 +30,58 @@ static dd_instance_data_t instance_data[SIZE_Y][SIZE_X] = {{0}};
 int32_t
 main( void )
 {
+#if 0
+#define N_PTS 100
+  msh_vec2_t circle_pts_a[N_PTS+100];
+  msh_vec2_t circle_pts_b[N_PTS+100];
+  double a = 0.01;
+  int n_steps = MSH_TWO_PI / a;
+  printf("%d\n", n_steps);
+  double c = 1.0;
+  double s = 0.0;
+  int counter = 0;
+  double theta = 0.0;
+  double dt = MSH_TWO_PI / N_PTS;
+
+
+  uint64_t t1, t2;
+  t1 = msh_time_now();
+  for (int i = 0; i < N_PTS;++i)
+  {
+    c = cos(i*dt);
+    s = sin(i*dt);
+    circle_pts_a[i] = msh_vec2(c,s);
+  }
+  t2 = msh_time_now();
+  printf("Microseconds: %f\n", msh_time_diff_us(t2,t1) );
+
+
+  t1 = msh_time_now();
+  c = 1.0;
+  s = 0.0;
+  for (int i = 0; i < n_steps; ++i)
+  {
+    c -= a*s;
+    if(i*a >= theta)
+    {
+      circle_pts_b[counter++] = msh_vec2(c,s);
+      theta += dt; 
+    }
+    s += a*c;
+  }
+  t2 = msh_time_now();
+  printf("Microseconds: %f\n", msh_time_diff_us(t2,t1) );
+#endif
+
+
+
   int32_t error = 0;
   app_state_t* state = calloc( 1, sizeof(app_state_t) );
   
   error = init( state );
   if( error ) { goto main_return; }
   
-  GLFWwindow* window    = state->window;
+  GLFWwindow* window = state->window;
   
   while( !glfwWindowShouldClose( window ) )
   {
@@ -139,6 +185,7 @@ frame(app_state_t* state)
     
   dd_ctx->aa_radius = dd_vec2( 10.0f, 0.0f );
   dd_set_primitive_size(dd_ctx, 12.0f);
+
 
   dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
   dd_circle2d(dd_ctx, (float[2]){0.0, 0.0}, 7.5 );

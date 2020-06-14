@@ -256,12 +256,14 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, cmd->instance_count * sizeof(dd_instance_data_t), cmd->instance_data));
     }
 
+
     if (cmd->draw_mode == DBGDRAW_MODE_FILL)
     {
       GLCHECK(glUseProgram(ctx->backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, cmd->shading_type));
-      // GLCHECK(glUniform)
+      GLCHECK(glUniform1i(2, (cmd->instance_count>0) ));
+
 #if DBGDRAW_HAS_TEXT_SUPPORT
       if (cmd->font_idx >= 0)
       {
@@ -285,6 +287,7 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUseProgram(ctx->backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, 0));
+      GLCHECK(glUniform1i(2, (int)(cmd->instance_count>0) ));
 
       if (cmd->instance_count <= 0)
       {
@@ -308,6 +311,7 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUniform2fv(2, 1, ctx->aa_radius.data));
       GLCHECK(glUniform1i(3, 0));
       GLCHECK(glUniform2i(4, cmd->base_index, cmd->vertex_count));
+      GLCHECK(glUniform1i(5, (cmd->instance_count>0) ));
 
       // For tex buffer lines vbo does not matter.
       if (cmd->instance_count <= 0)
@@ -377,6 +381,7 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
     DBGDRAW_STRINGIFY(
       layout(location = 0) uniform mat4 u_mvp;
       layout(location = 1) uniform int shading_type;
+      layout(location = 2) uniform bool instancing_enabled;
 
       layout(location = 0) in vec4 in_position_and_size;
       layout(location = 1) in vec3 in_uv_or_normal;
@@ -389,7 +394,8 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
       layout(location = 2) out flat int v_shading_type;
 
       void main() {
-        v_color = in_color + in_instance_col;
+        if (instancing_enabled) { v_color = in_color + in_instance_col; }
+        else                    { v_color = in_color; }
         if (shading_type == 0)
         {
           v_uv_or_normal = in_uv_or_normal;
@@ -399,7 +405,8 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
           v_uv_or_normal = vec3(u_mvp * vec4(in_uv_or_normal, 0.0));
         }
         v_shading_type = shading_type;
-        gl_Position = u_mvp * vec4(in_position_and_size.xyz + in_instance_pos, 1.0);
+        if (instancing_enabled) { gl_Position = u_mvp * vec4(in_position_and_size.xyz + in_instance_pos, 1.0); }
+        else                    { gl_Position = u_mvp * vec4(in_position_and_size.xyz, 1.0); }
         gl_PointSize = in_position_and_size.w;
       });
 
@@ -442,6 +449,7 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
       layout(location = 2) uniform vec2 u_aa_radius;
       layout(location = 3) uniform samplerBuffer u_line_data_sampler;
       layout(location = 4) uniform ivec2 u_command_info;
+      layout(location = 5) uniform bool instancing_enabled;
 
       out vec4 v_col;
       out noperspective float v_u;
@@ -502,12 +510,15 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
           pos_width[5] = get_vertex_position(line_ids_2[1], u_line_data_sampler);
         }
 
-        pos_width[0] = pos_width[0] + vec4(in_instance_pos, 0.0);
-        pos_width[1] = pos_width[1] + vec4(in_instance_pos, 0.0);
-        pos_width[2] = pos_width[2] + vec4(in_instance_pos, 0.0);
-        pos_width[3] = pos_width[3] + vec4(in_instance_pos, 0.0);
-        pos_width[4] = pos_width[4] + vec4(in_instance_pos, 0.0);
-        pos_width[5] = pos_width[5] + vec4(in_instance_pos, 0.0);
+        if (instancing_enabled)
+        { 
+          pos_width[0] = pos_width[0] + vec4(in_instance_pos, 0.0);
+          pos_width[1] = pos_width[1] + vec4(in_instance_pos, 0.0);
+          pos_width[2] = pos_width[2] + vec4(in_instance_pos, 0.0);
+          pos_width[3] = pos_width[3] + vec4(in_instance_pos, 0.0);
+          pos_width[4] = pos_width[4] + vec4(in_instance_pos, 0.0);
+          pos_width[5] = pos_width[5] + vec4(in_instance_pos, 0.0);
+        }
 
         vec4 clip_pos[6];
         clip_pos[0] = u_mvp * vec4(pos_width[0].xyz, 1.0);
@@ -616,10 +627,14 @@ void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr
 
         vec4 color[2];
         color[0] = get_vertex_color(line_ids_1[0] + 1, u_line_data_sampler);
-        color[0] += in_instance_col;
         color[1] = get_vertex_color(line_ids_1[1] + 1, u_line_data_sampler);
-        color[1] += in_instance_col;
 
+        if (instancing_enabled)
+        {
+          color[0] += in_instance_col;
+          color[1] += in_instance_col;
+        }
+        
         v_col = color[quad_pos.x];
         v_col.a = min(pos_width[2 + quad_pos.x].w * v_col.a, 1.0f);
 

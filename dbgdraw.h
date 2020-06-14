@@ -268,56 +268,32 @@ int32_t dd_backend_init_font_texture(dd_ctx_t *ctx,
 // Build-in colors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define DBGDRAW_RED \
-(dd_color_t) { 218, 40, 42, 255 }
-#define DBGDRAW_GREEN \
-(dd_color_t) { 38, 172, 38, 255 }
-#define DBGDRAW_BLUE \
-(dd_color_t) { 18, 72, 223, 255 }
-#define DBGDRAW_CYAN \
-(dd_color_t) { 21, 194, 195, 255 }
-#define DBGDRAW_MAGENTA \
-(dd_color_t) { 211, 68, 168, 255 }
-#define DBGDRAW_YELLOW \
-(dd_color_t) { 245, 245, 38, 255 }
-#define DBGDRAW_ORANGE \
-(dd_color_t) { 243, 146, 26, 255 }
-#define DBGDRAW_PURPLE \
-(dd_color_t) { 129, 26, 243, 255 }
-#define DBGDRAW_LIME \
-(dd_color_t) { 142, 243, 26, 255 }
-#define DBGDRAW_BROWN \
-(dd_color_t) { 138, 89, 47, 255 }
+#define DBGDRAW_RED (dd_color_t) { 218, 40, 42, 255 }
+#define DBGDRAW_GREEN (dd_color_t) { 38, 172, 38, 255 }
+#define DBGDRAW_BLUE (dd_color_t) { 18, 72, 223, 255 }
+#define DBGDRAW_CYAN (dd_color_t) { 21, 194, 195, 255 }
+#define DBGDRAW_MAGENTA (dd_color_t) { 211, 68, 168, 255 }
+#define DBGDRAW_YELLOW (dd_color_t) { 245, 245, 38, 255 }
+#define DBGDRAW_ORANGE (dd_color_t) { 243, 146, 26, 255 }
+#define DBGDRAW_PURPLE (dd_color_t) { 129, 26, 243, 255 }
+#define DBGDRAW_LIME (dd_color_t) { 142, 243, 26, 255 }
+#define DBGDRAW_BROWN (dd_color_t) { 138, 89, 47, 255 }
 
-#define DBGDRAW_LIGHT_RED \
-(dd_color_t) { 255, 108, 110, 255 }
-#define DBGDRAW_LIGHT_GREEN \
-(dd_color_t) { 117, 234, 117, 255 }
-#define DBGDRAW_LIGHT_BLUE \
-(dd_color_t) { 104, 140, 243, 255 }
-#define DBGDRAW_LIGHT_CYAN \
-(dd_color_t) { 129, 254, 255, 255 }
-#define DBGDRAW_LIGHT_MAGENTA \
-(dd_color_t) { 255, 144, 217, 255 }
-#define DBGDRAW_LIGHT_YELLOW \
-(dd_color_t) { 255, 255, 127, 255 }
-#define DBGDRAW_LIGHT_ORANGE \
-(dd_color_t) { 255, 197, 119, 255 }
-#define DBGDRAW_LIGHT_PURPLE \
-(dd_color_t) { 200, 152, 255, 255 }
-#define DBGDRAW_LIGHT_LIME \
-(dd_color_t) { 205, 255, 148, 255 }
-#define DBGDRAW_LIGHT_BROWN \
-(dd_color_t) { 209, 155, 100, 255 }
+#define DBGDRAW_LIGHT_RED (dd_color_t) { 255, 108, 110, 255 }
+#define DBGDRAW_LIGHT_GREEN (dd_color_t) { 117, 234, 117, 255 }
+#define DBGDRAW_LIGHT_BLUE (dd_color_t) { 104, 140, 243, 255 }
+#define DBGDRAW_LIGHT_CYAN (dd_color_t) { 129, 254, 255, 255 }
+#define DBGDRAW_LIGHT_MAGENTA (dd_color_t) { 255, 144, 217, 255 }
+#define DBGDRAW_LIGHT_YELLOW (dd_color_t) { 255, 255, 127, 255 }
+#define DBGDRAW_LIGHT_ORANGE (dd_color_t) { 255, 197, 119, 255 }
+#define DBGDRAW_LIGHT_PURPLE (dd_color_t) { 200, 152, 255, 255 }
+#define DBGDRAW_LIGHT_LIME (dd_color_t) { 205, 255, 148, 255 }
+#define DBGDRAW_LIGHT_BROWN (dd_color_t) { 209, 155, 100, 255 }
 
-#define DBGDRAW_BLACK \
-(dd_color_t) { 0, 0, 0, 255 }
-#define DBGDRAW_WHITE \
-(dd_color_t) { 255, 255, 255, 255 }
-#define DBGDRAW_GRAY \
-(dd_color_t) { 162, 162, 162, 255 }
-#define DBGDRAW_LIGHT_GRAY \
-(dd_color_t) { 200, 200, 200, 255 }
+#define DBGDRAW_BLACK (dd_color_t) { 0, 0, 0, 255 }
+#define DBGDRAW_WHITE (dd_color_t) { 255, 255, 255, 255 }
+#define DBGDRAW_GRAY (dd_color_t) { 162, 162, 162, 255 }
+#define DBGDRAW_LIGHT_GRAY (dd_color_t) { 200, 200, 200, 255 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Vector Math
@@ -476,6 +452,7 @@ typedef enum dd_error
   DBGDRAW_ERR_FONT_LIMIT_REACHED,
   DBGDRAW_ERR_OUT_OF_BOUNDS_ACCESS,
   DBGDRAW_ERR_INVALID_FONT_REQUESTED,
+  DBGDRAW_ERR_INVALID_MODE,
   DBGDRAW_ERR_USING_TEXT_WITHOUT_FONT,
 
   DBGDRAW_ERR_COUNT
@@ -1184,13 +1161,13 @@ dd__get_view_aligned_basis(dd_ctx_t *ctx, dd_vec3_t p)
 
     m.col[2] = dd_vec3_normalize(dd_vec3_sub(v, p));
 
-    m.col[0] = dd_vec3_normalize(dd_vec3_cross(m.col[2], u));
+    m.col[0] = dd_vec3_normalize(dd_vec3_cross(u, m.col[2]));
     m.col[1] = dd_vec3_cross(m.col[0], m.col[2]);
   }
   else
   {
     m = dd_mat4_to_mat3(inv_view);
-    m.col[0] = dd_vec3_invert(m.col[0]);
+    m.col[1] = dd_vec3_invert(m.col[1]);
   }
   return m;
 }
@@ -2930,6 +2907,7 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   DBGDRAW_ASSERT(ctx);
   DBGDRAW_ASSERT(pos);
 
+  DBGDRAW_VALIDATE(ctx->cur_cmd->draw_mode == DBGDRAW_MODE_FILL, DBGDRAW_ERR_INVALID_MODE);
   DBGDRAW_VALIDATE(ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD);
   ctx->cur_cmd->font_idx = ctx->active_font_idx;
   dd_font_data_t *font = ctx->fonts + ctx->active_font_idx;
@@ -2945,12 +2923,15 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   dd_vec3_t p = dd_vec3(pos[0], pos[1], pos[2]);
   float world_size = dd__pixels_to_world_size(ctx, p, (float)font->size);
   float scale = fabsf(world_size / font->size);
+  // scale = 0.05f;
 
   ctx->cur_cmd->min_depth = dd_mat4_vec3_mul(ctx->cur_cmd->xform, p, 1).z;
 
-  dd_mat4_t inv_view = dd_mat4_se3_inverse(ctx->view);
-  dd_mat3_t m = dd_mat4_to_mat3(inv_view);
-  m.col[0] = dd_vec3_invert(m.col[0]);
+  dd_mat3_t m;
+  if( !ctx->is_ortho)
+  {
+    m  = dd__get_view_aligned_basis(ctx, p);
+  }
 
   float width, height;
   if (info && info->width > 0)
@@ -2978,34 +2959,35 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   float vert_offset = 0.0, horz_offset = 0.0;
   switch (horz_align)
   {
-  case DBGDRAW_TEXT_LEFT:
-    horz_offset = 0.0f;
-    break;
-  case DBGDRAW_TEXT_RIGHT:
-    horz_offset = -width;
-    break;
-  case DBGDRAW_TEXT_CENTER:
-  default:
-    horz_offset = -width * 0.5f;
-    break;
+    case DBGDRAW_TEXT_LEFT:
+      horz_offset = 0.0f;
+      break;
+    case DBGDRAW_TEXT_RIGHT:
+      horz_offset = -width;
+      break;
+    case DBGDRAW_TEXT_CENTER:
+    default:
+      horz_offset = -width * 0.5f;
+      break;
   }
 
-  float sign = -1.0;
+  float sign = 1.0;
+  if( ctx->is_ortho && ctx->proj.col[1].y >= 0.0 ) { sign = -1.0f; }
   switch (vert_align)
   {
-  case DBGDRAW_TEXT_BASELINE:
-    vert_offset = 0.0f;
-    break;
-  case DBGDRAW_TEXT_BOTTOM:
-    vert_offset = sign * scale * font->descent;
-    break;
-  case DBGDRAW_TEXT_TOP:
-    vert_offset = sign * scale * font->ascent;
-    break;
-  case DBGDRAW_TEXT_MIDDLE:
-  default:
-    vert_offset = sign * scale * 0.5f * (font->ascent + font->descent);
-    break;
+    case DBGDRAW_TEXT_BASELINE:
+      vert_offset = 0.0f;
+      break;
+    case DBGDRAW_TEXT_BOTTOM:
+      vert_offset = sign * scale * font->descent;
+      break;
+    case DBGDRAW_TEXT_TOP:
+      vert_offset = sign * scale * font->ascent;
+      break;
+    case DBGDRAW_TEXT_MIDDLE:
+    default:
+      vert_offset = sign * scale * 0.5f * (font->ascent + font->descent);
+      break;
   }
 
   p.x += horz_offset;
@@ -3017,6 +2999,7 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
 
   dd_vec3_t pt_a, pt_b, pt_c;
   dd_vec2_t uv_a, uv_b, uv_c;
+  dd_vertex_t *start = ctx->verts_data + ctx->verts_len;
   for (int32_t i = 0; i < n_chars; ++i)
   {
     uint32_t cp = 0;
@@ -3025,10 +3008,13 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     stbtt_aligned_quad q;
     stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, &x, &y, &q, 0);
 
-    dd_vec3_t min_pt = dd_vec3(-scale * q.x0, -scale * q.y1, 0.0);
-    dd_vec3_t max_pt = dd_vec3(-scale * q.x1, -scale * q.y0, 0.0);
-    min_pt = dd_vec3_add(p, dd_mat3_vec3_mul(m, min_pt));
-    max_pt = dd_vec3_add(p, dd_mat3_vec3_mul(m, max_pt));
+    dd_vec3_t min_pt = dd_vec3( scale * q.x0, sign * scale * q.y1, 0.0);
+    dd_vec3_t max_pt = dd_vec3( scale * q.x1, sign * scale * q.y0, 0.0);
+    if (ctx->is_ortho)
+    {
+      min_pt = dd_vec3_add(p, min_pt);
+      max_pt = dd_vec3_add(p, max_pt);
+    }
 
     if (do_clipping)
     {
@@ -3121,7 +3107,19 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     dd__vertex_text(ctx, &pt_b, &uv_b);
     dd__vertex_text(ctx, &pt_c, &uv_c);
   }
+  dd_vertex_t *end = ctx->verts_data + ctx->verts_len;
 
+  if (!ctx->is_ortho)
+  {
+    dd_mat4_t xform = dd_mat4_identity();
+    xform.col[0] = dd_vec3_to_vec4(m.col[0]);
+    xform.col[1] = dd_vec3_to_vec4(m.col[1]);
+    xform.col[2] = dd_vec3_to_vec4(m.col[2]);
+    xform.col[3] = dd_vec3_to_vec4(p);
+    xform.col[3].w = 1.0f;
+    dd__transform_verts(xform, start, end, 0);
+  }
+  
   if (info)
   {
     info->anchor = dd_vec3(start_x, p.y + scale * font->descent, p.z);
@@ -3177,6 +3175,9 @@ const char *dd_error_message(int32_t error_code)
   case DBGDRAW_ERR_USING_TEXT_WITHOUT_FONT:
     return "[DBGDRAW ERROR] The active font used in \"dd_text_line(...)\" is invalid. Check if the font was properly initialized.\n"
            "                 If you are trying to use the default font, ensure that it was requested during the context initialization";
+    break;
+  case DBGDRAW_ERR_INVALID_MODE:
+    return "[DBGDRAW ERROR] Text rendering is only supported when using fill mode (DBGDRAW_MODE_FILL)";
     break;
   default:
     return "[DBGDRAW ERROR] Unknown error";

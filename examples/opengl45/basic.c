@@ -1,5 +1,7 @@
 #define MSH_VEC_MATH_INCLUDE_LIBC_HEADERS
 #define MSH_VEC_MATH_IMPLEMENTATION
+#define DBGDRAW_VALIDATION_LAYERS
+#define DBGDRAW_USE_DEFAULT_FONT
 
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
@@ -81,7 +83,8 @@ int32_t init( app_state_t* state ) {
     .max_commands = 16,
     .detail_level = 2,
     .enable_frustum_cull = false,
-    .enable_depth_test = true 
+    // .enable_depth_test = true,
+    .enable_default_font = 1
   };
   error = dd_init( state->dd_ctx, &desc );
   if( error )
@@ -110,7 +113,7 @@ void frame(app_state_t* state)
   if( angle > DBGDRAW_TWO_PI ) { angle -= (float)DBGDRAW_TWO_PI; }
   angle += 0.02f;
   
-  msh_vec3_t cam_pos = msh_vec3( 2.8f, 2.6f, 3.0f );
+  msh_vec3_t cam_pos = msh_vec3( 0.8f, 2.6f, 3.0f );
   msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
   msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
   msh_mat4_t proj = msh_perspective( fovy, (float)w/h, 0.1f, 100.0f );
@@ -131,7 +134,8 @@ void frame(app_state_t* state)
   
   dd_set_primitive_size( dd_ctx, 1.0f );
   dd_set_transform( dd_ctx, model.data );
-  
+
+  dd_set_primitive_size(dd_ctx, 1.0);
   dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
   dd_set_color( dd_ctx, DBGDRAW_RED );
   dd_line( dd_ctx, x0.data, x1.data );
@@ -143,6 +147,8 @@ void frame(app_state_t* state)
   dd_aabb( dd_ctx, msh_vec3( -1.1f, -1.1f, -1.1f ).data, msh_vec3( 1.1f, 1.1f, 1.1f ).data );
   dd_end_cmd( dd_ctx );
   
+
+
   dd_render( dd_ctx );
 }
 

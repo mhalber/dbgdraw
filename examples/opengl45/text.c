@@ -87,9 +87,9 @@ init( app_state_t* state ) {
     dd_ctx_desc_t desc = { .max_vertices = 1024*50,
         .max_commands = 32 };
     error = dd_init( state->dd_ctx, &desc );
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", 26, 512, 512, &TRUENO_FONT );
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 32, 512, 512, &CMU_FONT );
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/Anaktoria.ttf", 32, 512, 512, &ANAKTORIA_FONT );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", "Trueno", 26, 512, 512, &TRUENO_FONT );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/Anaktoria.ttf", "ANAKTORIA", 32, 512, 512, &ANAKTORIA_FONT );
     if( error )
     {
         fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
@@ -115,6 +115,7 @@ void frame(app_state_t* state)
     msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
     msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
     msh_mat4_t proj = msh_ortho( -w/2.0f, w/2.0f, -h/2.0f, h/2.0f, 0.01f, 10.0f );
+    // msh_mat4_t proj = msh_ortho( -w/2.0f, w/2.0f, h/2.0f, -h/2.0f, 0.01f, 10.0f );
     dd_new_frame_info_t frame_info = { 
         .view_matrix       = view.data,
         .projection_matrix = proj.data,
@@ -128,20 +129,20 @@ void frame(app_state_t* state)
     dd_set_font(dd_ctx, CMU_FONT );
     dd_set_color( dd_ctx, DBGDRAW_LIGHT_LIME );
     dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_text( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 42.0f, 0.0f).data, "The quick brown fox jumps over the lazy dog", NULL );
+    dd_text_line( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 42.0f, 0.0f).data, "The quick brown fox jumps over the lazy dog", NULL );
     dd_end_cmd( dd_ctx );
     
     dd_set_color( dd_ctx, DBGDRAW_LIGHT_CYAN );
     dd_text_info_t info = {0};
     dd_set_font(dd_ctx, ANAKTORIA_FONT );
     dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_text( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 82.0f, 0.0f).data, "Sphinx of black quartz, judge my vow.", &info );
+    dd_text_line( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 82.0f, 0.0f).data, "Sphinx of black quartz, judge my vow.", &info );
     dd_end_cmd( dd_ctx );
     
     dd_set_font(dd_ctx, CMU_FONT );
     dd_set_color( dd_ctx, DBGDRAW_LIGHT_BROWN );
     dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_text( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 122.0f, 0.0f).data, "Σωκράτης was a famous philosopher", NULL );
+    dd_text_line( dd_ctx, msh_vec3( base_x + 10.0f, base_y - 122.0f, 0.0f).data, "Σωκράτης was a famous philosopher", NULL );
     dd_end_cmd( dd_ctx );
     
     float x = 0.0f;
@@ -155,10 +156,10 @@ void frame(app_state_t* state)
     dd_text_info_t info_top = { .vert_align=DBGDRAW_TEXT_TOP };
     
     dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_text( dd_ctx, msh_vec3(x, y, 0).data, "Baseline", NULL);
-    dd_text( dd_ctx, msh_vec3(x+100, y, 0).data, "Bottom", &info_bottom );
-    dd_text( dd_ctx, msh_vec3(x-100, y, 0).data, "Middle", &info_middle );
-    dd_text( dd_ctx, msh_vec3(x-180, y, 0).data, "Top", &info_top );
+    dd_text_line( dd_ctx, msh_vec3(x, y, 0).data, "Baseline", NULL);
+    dd_text_line( dd_ctx, msh_vec3(x+100, y, 0).data, "Bottom", &info_bottom );
+    dd_text_line( dd_ctx, msh_vec3(x-100, y, 0).data, "Middle", &info_middle );
+    dd_text_line( dd_ctx, msh_vec3(x-180, y, 0).data, "Top", &info_top );
     dd_end_cmd( dd_ctx );
     
     
@@ -176,9 +177,9 @@ void frame(app_state_t* state)
     
     dd_set_color( dd_ctx, DBGDRAW_WHITE );
     dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_text( dd_ctx, msh_vec3(x, y, 0).data, "Left", &info_left );
-    dd_text( dd_ctx, msh_vec3(x, y-32, 0).data, "Right", &info_right);
-    dd_text( dd_ctx, msh_vec3(x, y-64, 0).data, "Center", &info_center );
+    dd_text_line( dd_ctx, msh_vec3(x, y, 0).data, "Left", &info_left );
+    dd_text_line( dd_ctx, msh_vec3(x, y-32, 0).data, "Right", &info_right);
+    dd_text_line( dd_ctx, msh_vec3(x, y-64, 0).data, "Center", &info_center );
     dd_end_cmd( dd_ctx );
     
     dd_set_color( dd_ctx, DBGDRAW_LIGHT_GRAY );
@@ -186,7 +187,6 @@ void frame(app_state_t* state)
     dd_line( dd_ctx, msh_vec3(x, y+30.0f, 0.0f).data, msh_vec3(x, y-80.0f, -5.0f).data );
     dd_end_cmd( dd_ctx );
     
-    dd_sort_commands( dd_ctx );
     dd_render( dd_ctx );
 }
 
