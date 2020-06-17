@@ -1,18 +1,91 @@
 
 
 /*
-Usage
+  OVERVIEW
+  =================
+  dbgdraw - C99 immediate mode drawing library, by Maciej Halber, 2020. See the end of file for licensing info
 
-Configuration
-memory -mallocs
-string - memset memcpy strncmp, strncpy strnlen
-asserts
-math
-sin
+  dbgdraw is an attempt at creating a drawing library that allows user to easily start drawing
+  shapes like bounding boxes, spheres, and other common shapes that are useful when visualizing 3D data.
+  The idea is that these shapes are driven by some algorithm that updates 3d data (think dynamic aabb trees), and 
+  as such different shapes need to be drawn at each frame.
+  This library also includes rudimentaty, not very memory efficient 2D support. This also includes
+  optional support for text rendering, if user also includes stb_truetype.
 
-handle out of memory
+  USAGE
+  =================
+  dbgdraw only provides facilities to perform drawing operations. As such any windowing support needs to be
+  done separately. The use of the library is centered around context structure `dd_ctx_t` which stores
+  required information to render the data. There are three steps that dbgdraw expects user to do.
+  
+  1) At initialization time, user should populate `dd_ctx_desc_t` structure with relevant options and call
+  `dd_init` function.
 
-Credits
+  2) At a frame time, user should populate 'dd_new_frame_info_t' structure with relevant information (viewport size,
+  transformation matrices).
+
+  3) After all commands are issued, user is expected to signal this to dbgdraw by calling `dd_render` function.
+
+  After this setup user can begin drawing shapes by simply issueing draw commands in between, dd_begin_cmd and dd_end_cmd
+  calls. For example, to draw green sphere and blue aabb:
+  
+  ```
+  dd_begin_cmd(ctx_ptr, DBGDRAW_MODE_FILL);
+  dd_set_color(ctx_ptr, DBGDRAW_GREEN)l
+  dd_sphere(ctx_ptr, &shpere_center, radius);
+  dd_set_color(ctx_ptr, DBGDRAW_BLUE);
+  dd_aabb(ctx_ptr, &min_aabb_pt, &max_aabb_pt);
+  dd_end_cmd(ctx_ptr);
+  ```
+
+  A good place to start to see the API usage is the basic.c example in the github repository:
+   [ link ]
+
+  GRAPHICS API
+  ==============
+  dbgdraw is backend agnostic. Backend drawing functionality is initialized by providing definitions to following functions
+   - `dd_backend_init`
+   - `dd_backend_render`
+   - `dd_backend_term`
+   - (optional)`dd_backend_init_texture`
+
+  CONFIGURATION
+  ===============
+  dbgdraw can be configured to match your needs. Below we 
+  memory -mallocs
+  string - memset memcpy strncmp, strncpy strnlen
+  asserts
+  math
+  sin
+  handle out of memory
+
+  GOOD PRACTICES
+  ================
+  To limit the amount of draw call issues, if possible try to group the draw calls that operate in the same mode.
+  Specifically, instead of 
+  ```
+  ```
+  do this:
+  ````
+  ````
+
+  FEATURES
+  ================
+  - OpenGL 4.5 backend
+  - Optional validation layers that will check if state of dd_ctx_t is properly modified.
+  - POD function signatures - drawing functions expect just basic data passed as float*. You can use glm, Eigen, HMM or whatever
+  else libary to do client side computation and simply pass the pointer to the data to dbgdraw 
+  (as long as you're using floats, which most likely you are.)
+  - Default font embedded in this file
+
+  CREDITS
+  =================
+  rxi - cembed used to produce the font embedding
+  Micha Metke - Deflate for default font
+
+  EXAMPLE PROGRAM
+  =================
+  Note that this sample omits the 
 */
 
 #ifndef DBGDRAW_H
@@ -36,7 +109,7 @@ extern "C"
 #if defined(DBGDRAW_MALLOC) && defined(DBGDRAW_FREE)
   // all good
 #elif !defined(DBGDRAW_MALLOC) && !defined(DBGDRAW_FREE)
-// all good
+  // all good
 #else
 #error "If you redefined any of 'malloc', 'realloc' or 'free' functions, please redefine all of them"
 #endif
@@ -51,7 +124,7 @@ extern "C"
 #if (defined(DBGDRAW_MEMSET) && defined(DBGDRAW_MEMCPY) && defined(DBGDRAW_STRNCPY) && defined(DBGDRAW_STRNLEN) && defined(STRNCMP))
   // all good
 #elif !defined(DBGDRAW_MEMSET) && !defined(DBGDRAW_MEMCPY) && !defined(DBGDRAW_STRNCPY) && !defined(DBGDRAW_STRNLEN) && !defined(STRNCMP)
-// all good
+  // all good
 #else
 #error "If you redefined any of 'memset', 'memcpy', 'strncmp', 'strncpy' or 'strnlen' functions, please redefine all of them"
 #endif
@@ -464,6 +537,7 @@ typedef struct dd_context_desc
 {
   int32_t max_vertices;
   int32_t max_commands;
+  int32_t max_instances;
   int32_t max_fonts;
   uint8_t detail_level;
   float line_antialias_radius;
@@ -583,6 +657,8 @@ typedef struct dd_ctx_t
   dd_vec2_t aa_radius;
   uint8_t enable_depth_test;
 
+  /* Extras */
+  int32_t instance_cap;
   float *sinf_lut;
   float *cosf_lut;
   float lut_gamma;
@@ -671,6 +747,8 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
     return DBGDRAW_ERR_FAILED_ALLOC;
   }
   DBGDRAW_MEMSET(ctx->commands, 0, ctx->commands_cap * sizeof(dd_cmd_t));
+
+  ctx->instance_cap = DD_MAX(512, desc->max_instances);
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
   ctx->fonts_len = 0;
@@ -2719,9 +2797,9 @@ dd_torus(dd_ctx_t *ctx, float *center, float radius_a, float radius_b)
   return DBGDRAW_ERR_OK;
 }
 
-/////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Font Loading
-/////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
 

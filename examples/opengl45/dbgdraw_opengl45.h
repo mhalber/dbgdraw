@@ -159,7 +159,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   backend.vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
   GLCHECK(glNamedBufferData(backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW));
-  backend.ibo_size = 128 * sizeof(dd_vec3_t);
+  backend.ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
   GLCHECK(glNamedBufferData(backend.ibo, backend.ibo_size, NULL, GL_DYNAMIC_DRAW));
 
   GLCHECK(glCreateTextures(GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id));
@@ -248,12 +248,13 @@ dd_backend_render(dd_ctx_t *ctx)
 
     if (cmd->instance_count && cmd->instance_data)
     {
-      if (ctx->backend->ibo_size < cmd->instance_count * sizeof(dd_instance_data_t))
+      if (ctx->backend->ibo_size < ctx->instance_cap * sizeof(dd_instance_data_t))
       {
-        ctx->backend->ibo_size = cmd->instance_count * sizeof(dd_instance_data_t);
+        ctx->instance_cap = cmd->instance_count;
+        ctx->backend->ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
         GLCHECK(glNamedBufferData(ctx->backend->ibo, ctx->backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
       }
-      GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, cmd->instance_count * sizeof(dd_instance_data_t), cmd->instance_data));
+      GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, ctx->backend->ibo_size, cmd->instance_data));
     }
 
 
