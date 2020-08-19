@@ -82,10 +82,11 @@
   =================
   rxi - cembed used to produce the font embedding
   Micha Metke - Deflate for default font
+  Bjoern Hoehrmann - UTF-8 decoder
 
   EXAMPLE PROGRAM
   =================
-  Note that this sample omits the 
+  TODO
 */
 
 #ifndef DBGDRAW_H
@@ -336,6 +337,10 @@ int32_t dd_backend_term(dd_ctx_t *ctx);
 int32_t dd_backend_init_font_texture(dd_ctx_t *ctx,
                                       const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id);
 #endif
+
+const char * dd__decode_char_incorrect(const char *str, uint32_t *cp);
+const char* dd__decode_char(const char *str, uint32_t *cp);
+int32_t dd__codepoint_to_index(uint32_t cp);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Build-in colors
@@ -2851,6 +2856,97 @@ dd_init_font_from_memory(dd_ctx_t *ctx, const void *ttf_buf,
   return DBGDRAW_ERR_OK;
 }
 
+/*UTF-8 decoder by Bjoern Hoehrmann. See end of file for licensing*/
+#define DD_UTF8_ACCEPT 0
+#define DD_UTF8_REJECT 12
+
+static const uint8_t dd_utf8d_table[] = {
+  // The first part of the table maps bytes to character classes that
+  // to reduce the size of the transition table and create bitmasks.
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
+   8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+  10,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3, 11,6,6,6,5,8,8,8,8,8,8,8,8,8,8,8,
+
+  // The second part is a transition table that maps a combination
+  // of a state of the automaton and a character class to a state.
+   0,12,24,36,60,96,84,12,12,12,48,72, 12,12,12,12,12,12,12,12,12,12,12,12,
+  12, 0,12,12,12,12,12, 0,12, 0,12,12, 12,24,12,12,12,12,12,24,12,24,12,12,
+  12,12,12,12,12,12,12,24,12,12,12,12, 12,24,12,12,12,12,12,12,12,24,12,12,
+  12,12,12,12,12,12,12,36,12,36,12,12, 12,36,12,12,12,12,12,36,12,36,12,12,
+  12,36,12,12,12,12,12,12,12,12,12,12, 
+};
+
+uint32_t inline
+dd__utf8_decode(uint32_t* state, uint32_t* codep, uint32_t byte)
+{
+  uint32_t type = dd_utf8d_table[byte];
+
+  *codep = (*state != DD_UTF8_ACCEPT) ?
+    (byte & 0x3fu) | (*codep << 6) :
+    (0xff >> type) & (byte);
+
+  *state = dd_utf8d_table[256 + *state + type];
+  return *state;
+}
+
+const char*
+dd__decode_char(const char* str, uint32_t* cp)
+{
+  uint32_t state = 0;
+
+  int32_t count = 0;
+  const uint8_t* ustr = (const uint8_t*)str;
+  for (; *ustr; ++ustr)
+  {
+    count++;
+    if (!dd__utf8_decode(&state, cp, *ustr))
+    {
+      break;
+    }
+  }
+  str += count;
+
+  if (state != DD_UTF8_ACCEPT)
+  {
+    return NULL;
+  }
+  
+  return str;
+}
+
+int32_t
+dd__codepoint_to_index(uint32_t codepoint)
+{
+  int32_t shift = (codepoint < 128) ? 32 : (0x391 - 95);
+  return codepoint - shift;
+}
+
+int32_t
+dd__strlen(const char* str)
+{
+  uint32_t cp;
+  uint32_t state = 0;
+
+  int32_t count = 0;
+  const uint8_t* ustr = (const uint8_t*)str;
+  for (; *ustr; ++ustr)
+  {
+    if (!dd__utf8_decode(&state, &cp, *ustr))
+    {
+      count++;
+    }
+  }
+
+  if (state != DD_UTF8_ACCEPT) { count = 0; }
+
+  return count;
+}
+
 /* Functions below are incorrect, as they dont correctly decode utf-8, just a subset including latin and greek */
 const char *
 dd__decode_char_incorrect(const char *str, uint32_t *cp)
@@ -2912,11 +3008,14 @@ void dd_get_text_size_font_space(dd_ctx_t *ctx, int32_t font_idx, const char *st
   *height = font->ascent - font->descent;
   for (int32_t i = 0; i < strlen; ++i)
   {
-    uint32_t cp;
-    str = dd__decode_char_incorrect(str, &cp);
+    uint32_t cp, idx;
+    // str = dd__decode_char_incorrect(str, &cp);
+    str = dd__decode_char(str, &cp);
+    idx = dd__codepoint_to_index(cp);
     stbtt_aligned_quad q;
     float dummy;
-    stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, width, &dummy, &q, 0);
+    // stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, width, &dummy, &q, 0);
+    stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, idx, width, &dummy, &q, 0);
   }
 }
 
@@ -2992,7 +3091,8 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   DBGDRAW_VALIDATE(font->name != NULL, DBGDRAW_ERR_USING_TEXT_WITHOUT_FONT);
 
   // NOTE(maciej): Only handles valid UTF-8 characters between cps U+0000 and U+07FF! It's awful!!
-  int32_t n_chars = dd__strlen_incorrect(str);
+  // int32_t n_chars = dd__strlen_incorrect(str);
+  int32_t n_chars = dd__strlen(str);
   uint8_t do_clipping = info && (info->clip_rect.w > 0 && info->clip_rect.h > 0);
 
   int32_t new_verts = 6 * n_chars;
@@ -3080,11 +3180,18 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   dd_vertex_t *start = ctx->verts_data + ctx->verts_len;
   for (int32_t i = 0; i < n_chars; ++i)
   {
-    uint32_t cp = 0;
-    str = dd__decode_char_incorrect(str, &cp);
+    // uint32_t cp2 = 0;
+    // dd_decode_char(str, &cp2);
+    uint32_t cp=0;
+    // str = dd__decode_char_incorrect(str, &cp);
+    // int32_t idx = cp;
+    // printf("%u ", cp);
+    str = dd__decode_char(str, &cp);
+    int32_t idx = dd__codepoint_to_index(cp);
+    // printf("%u %d\n", cp, idx);
 
     stbtt_aligned_quad q;
-    stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, &x, &y, &q, 0);
+    stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, idx, &x, &y, &q, 0);
 
     dd_vec3_t min_pt = dd_vec3( scale * q.x0, sign * scale * q.y1, 0.0);
     dd_vec3_t max_pt = dd_vec3( scale * q.x1, sign * scale * q.y0, 0.0);
@@ -4350,3 +4457,26 @@ static unsigned char dd_proggy_square[7976] = {
 
 
 #endif /* DBGDRAW_IMPLEMENTATION */
+
+/*
+LICENSE INFO
+========================================================================
+Dbgdraw Library:
+
+
+UTF-8 Decode:
+Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
+the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and 
+to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT 
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/

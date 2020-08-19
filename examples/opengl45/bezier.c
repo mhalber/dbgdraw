@@ -89,8 +89,8 @@ int32_t init( app_state_t* state ) {
         .line_antialias_radius = 2.0f
     };
     error = dd_init( state->dd_ctx, &desc );
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 32, 512, 512, &CMU_FONT );
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", 20, 512, 512, &CMU_FONT_SMALL );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 20, 512, 512, &CMU_FONT_SMALL );
     if( error )
     {
         fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
@@ -214,7 +214,7 @@ draw_labeled_points(dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t
     {
         char* underscore = strchr( pts_labels[i], '_' );
         strncpy( buf, pts_labels[i], (underscore - pts_labels[i]) );
-        dd_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, buf, NULL );
+        dd_text_line( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, buf, NULL );
     }
     dd_end_cmd( dd_ctx );
     
@@ -225,7 +225,7 @@ draw_labeled_points(dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t
     for( int32_t i = 0; i < n_pts ; ++i )
     {
         char* underscore = strchr( pts_labels[i], '_' );
-        dd_text( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, underscore+1, NULL );
+        dd_text_line( dd_ctx, dd_vec3( pts[i].x + offset_x, pts[i].y + offset_y, 0.0f ).data, underscore+1, NULL );
     }
     dd_end_cmd( dd_ctx );
     

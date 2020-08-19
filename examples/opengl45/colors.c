@@ -91,7 +91,7 @@ int32_t init( app_state_t* state ) {
         fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
         return 1;
     }
-    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", 26, 512, 512, &TRUENO_FONT );
+    error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", "TRUENO", 26, 512, 512, &TRUENO_FONT );
     if( error ) { exit( EXIT_FAILURE ); }
     
     return 0;
@@ -132,7 +132,7 @@ draw_color_tile(dd_ctx_t* dd_ctx, float x, float y, float r,
     
     dd_set_color( dd_ctx, text_color );
     dd_text_info_t ti = {.vert_align = DBGDRAW_TEXT_CENTER };
-    dd_text( dd_ctx, msh_vec3((float)x, y-font_size-p/2.0f, 0.0f).data, name, &ti );
+    dd_text_line( dd_ctx, msh_vec3((float)x, y-font_size-p/2.0f, 0.0f).data, name, &ti );
     dd_end_cmd( dd_ctx );
 }
 
