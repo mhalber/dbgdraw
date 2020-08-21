@@ -93,26 +93,6 @@ init( app_state_t* state ) {
 	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
 	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/Anaktoria.ttf", "ANAKTORIA", 32, 512, 512, &ANAKTORIA_FONT );
 
-	// const char* str3 = "TESTAS";
-	// for (int i = 0; i < 6; ++i)
-	// {
-	// 	uint32_t cp = 0;
-	// 	str3 = dd__decode_char(str3, &cp);
-	// 	uint32_t idx = dd__codepoint_to_index(cp);
-	// 	printf("%d %c ", idx, idx+32);
-	// }
-	// printf("\n");
-
-	// const char* str4 = "TESTAS";
-	// for (int i = 0; i < 6; ++i)
-	// {
-	// 		uint32_t cp = 0;
-	// 		str4 = dd__decode_char_incorrect(str4, &cp);
-	// 		printf("%d %c ", cp, cp+32);
-	// }
-	// printf("\n");
-	// exit(5);
-
 	if( error )
 	{
 		fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
@@ -138,7 +118,7 @@ void frame(app_state_t* state)
 	msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
 	msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
 	msh_mat4_t proj = msh_ortho( -w/2.0f, w/2.0f, -h/2.0f, h/2.0f, 0.01f, 10.0f );
-	// msh_mat4_t proj = msh_ortho( -w/2.0f, w/2.0f, h/2.0f, -h/2.0f, 0.01f, 10.0f );
+
 	dd_new_frame_info_t frame_info = { 
 			.view_matrix       = view.data,
 			.projection_matrix = proj.data,

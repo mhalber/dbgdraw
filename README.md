@@ -101,4 +101,10 @@ The above code will cause all function that fill-in the buffer to exit early wit
 
 To use dbgdraw you can simply drop the `dbgdraw.h` into your application source tree and add `#define DBGDRAW_IMPLEMENTATION` and `#include "dbgdraw.h"`. Optionally, there is also `dbgdraw.c` that you can add to your build if you wish to avoid the recompilation of the dbgdraw library each time.
 
-As far as examples go, everyone has their favorite build system, and everyone has a build system that they hate vehemently. As such, for now, I have opted to simply add build-system-free scripts that simply call the compiler directly. For more details, see the examples directory. I currently do not have macros machine at hand to test the building of these at hand - I welcome pull requests to add these!
+To build the examples you can use CMake, by simply
+~~
+mkdir build
+cd build
+cmake .. -G "<your favourite generator>"
+<build using your preferred method, make, nmake, Visual Studio, etc.>
+~~

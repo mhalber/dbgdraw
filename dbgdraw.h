@@ -338,10 +338,6 @@ int32_t dd_backend_init_font_texture(dd_ctx_t *ctx,
                                       const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id);
 #endif
 
-const char * dd__decode_char_incorrect(const char *str, uint32_t *cp);
-const char* dd__decode_char(const char *str, uint32_t *cp);
-int32_t dd__codepoint_to_index(uint32_t cp);
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Build-in colors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2947,56 +2943,6 @@ dd__strlen(const char* str)
   return count;
 }
 
-/* Functions below are incorrect, as they dont correctly decode utf-8, just a subset including latin and greek */
-const char *
-dd__decode_char_incorrect(const char *str, uint32_t *cp)
-{
-  const char *str_cpy = str;
-  uint8_t ch = (uint8_t)(*str_cpy);
-  if (ch < 128)
-  {
-    *cp = (uint32_t)*str_cpy++;
-  }
-  else
-  {
-    uint8_t a = (uint8_t)(*str_cpy++) & 0x1f;
-    uint8_t b = (uint8_t)(*str_cpy++) & 0x3f;
-    *cp = (a << 6) | b;
-  }
-  // 32 is first ascii char, 0x391 is the first greek char, and 95 is number of ASCII chars
-  int32_t shift = (*cp < 128) ? 32 : (0x391 - 95);
-  *cp -= shift;
-
-  return str_cpy;
-}
-
-int32_t
-dd__strlen_incorrect(const char *str)
-{
-  int32_t len = 0;
-  const char *str_cpy = str;
-  while (1)
-  {
-    if (*str_cpy == '\0')
-    {
-      break;
-    }
-    // ASCII Char
-    if ((uint8_t)*str_cpy < 128)
-    {
-      str_cpy++;
-      len++;
-    }
-    // Other char, assuming 2 bytes
-    else
-    {
-      str_cpy += 2;
-      len++;
-    }
-  }
-  return len;
-}
-
 void dd_get_text_size_font_space(dd_ctx_t *ctx, int32_t font_idx, const char *str, int32_t strlen, float *width, float *height)
 {
   DBGDRAW_ASSERT(ctx);
@@ -3009,12 +2955,10 @@ void dd_get_text_size_font_space(dd_ctx_t *ctx, int32_t font_idx, const char *st
   for (int32_t i = 0; i < strlen; ++i)
   {
     uint32_t cp, idx;
-    // str = dd__decode_char_incorrect(str, &cp);
     str = dd__decode_char(str, &cp);
     idx = dd__codepoint_to_index(cp);
     stbtt_aligned_quad q;
     float dummy;
-    // stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, cp, width, &dummy, &q, 0);
     stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, idx, width, &dummy, &q, 0);
   }
 }
@@ -3091,7 +3035,6 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   DBGDRAW_VALIDATE(font->name != NULL, DBGDRAW_ERR_USING_TEXT_WITHOUT_FONT);
 
   // NOTE(maciej): Only handles valid UTF-8 characters between cps U+0000 and U+07FF! It's awful!!
-  // int32_t n_chars = dd__strlen_incorrect(str);
   int32_t n_chars = dd__strlen(str);
   uint8_t do_clipping = info && (info->clip_rect.w > 0 && info->clip_rect.h > 0);
 
@@ -3180,15 +3123,9 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   dd_vertex_t *start = ctx->verts_data + ctx->verts_len;
   for (int32_t i = 0; i < n_chars; ++i)
   {
-    // uint32_t cp2 = 0;
-    // dd_decode_char(str, &cp2);
     uint32_t cp=0;
-    // str = dd__decode_char_incorrect(str, &cp);
-    // int32_t idx = cp;
-    // printf("%u ", cp);
     str = dd__decode_char(str, &cp);
     int32_t idx = dd__codepoint_to_index(cp);
-    // printf("%u %d\n", cp, idx);
 
     stbtt_aligned_quad q;
     stbtt_GetPackedQuad(font->char_data, font->bitmap_width, font->bitmap_height, idx, &x, &y, &q, 0);
