@@ -11,8 +11,19 @@ static const char *PROGRAM_NAME = "dbgdraw_instancing";
 #include "dbgdraw.h"
 
 #include "GLFW/glfw3.h"
-#include "glad.h"
+#if defined(DD_USE_OGL_33)
+#include "glad33.h"
+#include "dbgdraw_opengl33.h"
+#define DD_GL_VERSION_MAJOR 3
+#define DD_GL_VERSION_MINOR 3
+#elif defined(DD_USE_OGL_45)
+#include "glad45.h"
 #include "dbgdraw_opengl45.h"
+#define DD_GL_VERSION_MAJOR 4
+#define DD_GL_VERSION_MINOR 5
+#else
+#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL45!"
+#endif
 
 typedef struct {
     GLFWwindow* window;
@@ -109,8 +120,8 @@ init( app_state_t* state )
   }
   
   int32_t win_width = 640, win_height = 320;
-  glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 4 );
-  glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 5 );
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
   glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
   glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
   glfwWindowHint( GLFW_SAMPLES, 4 );
@@ -185,7 +196,6 @@ frame(app_state_t* state)
     
   dd_ctx->aa_radius = dd_vec2( 10.0f, 0.0f );
   dd_set_primitive_size(dd_ctx, 12.0f);
-
 
   dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
   dd_circle2d(dd_ctx, (float[2]){0.0, 0.0}, 7.5 );

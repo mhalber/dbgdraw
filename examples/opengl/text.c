@@ -11,8 +11,19 @@ static const char *PROGRAM_NAME = "debugdraw_text";
 #include "dbgdraw.h"
 
 #include "GLFW/glfw3.h"
-#include "glad.h"
+#if defined(DD_USE_OGL_33)
+#include "glad33.h"
+#include "dbgdraw_opengl33.h"
+#define DD_GL_VERSION_MAJOR 3
+#define DD_GL_VERSION_MINOR 3
+#elif defined(DD_USE_OGL_45)
+#include "glad45.h"
 #include "dbgdraw_opengl45.h"
+#define DD_GL_VERSION_MAJOR 4
+#define DD_GL_VERSION_MINOR 5
+#else
+#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL45!"
+#endif
 
 typedef struct {
     GLFWwindow* window;
@@ -23,14 +34,12 @@ int32_t init( app_state_t* state );
 void frame( app_state_t* state );
 void cleanup( app_state_t* state );
 
-
 int32_t
 main( void )
 {
     int32_t error = 0;
     app_state_t* state = calloc( 1, sizeof(app_state_t) );
     
-
     error = init( state );
     if( error ) { goto main_return; }
     
@@ -44,7 +53,6 @@ main( void )
         glfwPollEvents();
     }
     
-
     main_return:
     cleanup( state );
     return error;
@@ -65,8 +73,8 @@ init( app_state_t* state ) {
 	}
 	
 	int32_t win_width = 640, win_height = 320;
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SAMPLES, 4);
@@ -83,7 +91,6 @@ init( app_state_t* state ) {
 		fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
 		return 1;
 	}
-	CMU_FONT=-1;
 	
 	state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
 	dd_ctx_desc_t desc = { .max_vertices = 1024*50,

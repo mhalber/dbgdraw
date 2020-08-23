@@ -11,7 +11,7 @@ set( EXAMPLES_DIR "${CMAKE_SOURCE_DIR}/examples")
 
 include_directories( "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/external" "${EXAMPLES_DIR}/opengl45" ${GLFW3_INCLUDE_DIR} )
 
-set( COMMON_SRCS "${CMAKE_SOURCE_DIR}/external/glad.c" "${CMAKE_SOURCE_DIR}/dbgdraw.c" )
+set( COMMON_SRCS "${CMAKE_SOURCE_DIR}/external/glad45.c" "${CMAKE_SOURCE_DIR}/dbgdraw.c" )
 
 set( TARGETS "basic" "bezier" "colors" "frustum_culling" "lines" "primitives" "text" )
 

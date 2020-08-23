@@ -14,7 +14,7 @@ dbgdraw is intended to be a small immediate mode library for putting simple grap
 ### Current issues
 
 - No full UTF-8 support, just Latin + Greek character ranges
-- The only backend is OpenGL 4.5
+- Only openGL backends at this point, for OpenGL3.3 and OpenGL4.5
 
 ### Usage
 

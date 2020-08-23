@@ -311,8 +311,8 @@ int32_t dd_init_font_from_memory(dd_ctx_t *ctx, const void *ttf_buf,
                                   int32_t *font_idx);
 #ifndef DBGDRAW_NO_STDIO
 int32_t dd_init_font_from_file(dd_ctx_t *ctx, const char *font_path, 
-                                const char* name, int32_t font_size, int32_t width, int32_t height,
-                                int32_t *font_idx);
+                               const char* name, int32_t font_size, int32_t width, int32_t height,
+                               int32_t *font_idx);
 #endif
 #endif
 
@@ -504,7 +504,7 @@ typedef struct dd_font_data
   int32_t bitmap_width, bitmap_height;
   float ascent, descent, line_gap;
 
-  stbtt_packedchar char_data[256];
+  stbtt_packedchar char_data[1024];
   stbtt_fontinfo info;
   uint32_t size;
   uint32_t tex_id;
@@ -1514,16 +1514,21 @@ void dd__arc_point(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, 
 
 void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, int32_t resolution)
 {
-  int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
-  int32_t mod = full_circle ? -1 : 0;
-  float d_theta = theta / (resolution + mod);
-
   dd_vec3_t pt_a = dd_vec3(center->x, center->y, center->z);
   dd_vec3_t pt_b = dd_vec3(center->x, center->y + radius, center->z);
+
+  int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
   if (!full_circle)
   {
     dd__line(ctx, &pt_a, &pt_b);
   }
+  else
+  {
+    resolution+=1;
+  }
+  
+  int32_t mod = full_circle ? -1 : 0;
+  float d_theta = theta / (resolution + mod);
 
   float theta1, theta2;
   float ox1, ox2, oy1, oy2;
@@ -1554,9 +1559,8 @@ void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta,
   }
   else
   {
-    /* This is an ugly fix, where we already added an extra line segment to simulated closes circle. 
-       Now we want to move joint point to be on the straight segment and not on the curve. 
-       Also avoids overlap. */
+    /* This is an ugly fix to allow non-broken lines.
+       We add an extra segment, and we modify its positions to lie on a segment, not vertex. */
     dd_vertex_t* v1 = ctx->verts_data + ctx->cur_cmd->base_index;
     dd_vertex_t* v2 = v1 + 1;
     dd_vec3_t p1 = v1->pos;
@@ -1805,7 +1809,7 @@ void dd__cone(dd_ctx_t *ctx, dd_vec3_t a, dd_vec3_t b, float radius, int32_t res
 
   dd_vec3_t zero_pt = dd_vec3(0.0f, 0.0f, 0.0f);
   dd_vertex_t *start_ptr = ctx->verts_data + ctx->verts_len;
-  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 0);
+  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 1);
   dd_vertex_t *end_ptr = ctx->verts_data + ctx->verts_len;
   dd__transform_verts(xform, start_ptr, end_ptr, has_normals);
 
@@ -2411,7 +2415,6 @@ dd__circle_ex(dd_ctx_t *ctx, float *center, float radius, uint8_t is_3d)
   DBGDRAW_ASSERT(center);
 
   int32_t resolution = 1 << (ctx->detail_level + 2);
-  if ( ctx->cur_cmd->draw_mode == DBGDRAW_MODE_STROKE ) { resolution += 1; }
   int32_t mode_vert_count[DBGDRAW_MODE_COUNT];
   mode_vert_count[DBGDRAW_MODE_POINT] = resolution;
   mode_vert_count[DBGDRAW_MODE_STROKE] = 2 * resolution;
@@ -2804,9 +2807,8 @@ dd_torus(dd_ctx_t *ctx, float *center, float radius_a, float radius_b)
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
 
-// TODO(maciej): Font name
 int32_t
-dd_init_font_from_memory(dd_ctx_t *ctx, const void *ttf_buf,
+  dd_init_font_from_memory(dd_ctx_t *ctx, const void *ttf_buf,
                          const char *name, int32_t font_size, int32_t width, int32_t height,
                          int32_t *font_idx)
 {
@@ -2918,7 +2920,13 @@ dd__decode_char(const char* str, uint32_t* cp)
 int32_t
 dd__codepoint_to_index(uint32_t codepoint)
 {
-  int32_t shift = (codepoint < 128) ? 32 : (0x391 - 95);
+  int shift = 0xf000 - 151;
+  if( codepoint < 0xf000 )
+  {
+    if ( codepoint < 128 )  { shift = 32; }
+    else                    { shift = (0x391 - 95); }
+  }
+  // int32_t shift = (codepoint < 128) ? 32 : (0x391 - 95);
   return codepoint - shift;
 }
 

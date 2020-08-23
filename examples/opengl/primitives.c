@@ -17,8 +17,19 @@ static const char *PROGRAM_NAME = "dbgdraw_primitives.c";
 #include "overlay.h"
 
 #include "GLFW/glfw3.h"
-#include "glad.h"
+#if defined(DD_USE_OGL_33)
+#include "glad33.h"
+#include "dbgdraw_opengl33.h"
+#define DD_GL_VERSION_MAJOR 3
+#define DD_GL_VERSION_MINOR 3
+#elif defined(DD_USE_OGL_45)
+#include "glad45.h"
 #include "dbgdraw_opengl45.h"
+#define DD_GL_VERSION_MAJOR 4
+#define DD_GL_VERSION_MINOR 5
+#else
+#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL45!"
+#endif
 
 
 typedef struct {
@@ -113,8 +124,8 @@ init( app_state_t* state )
     }
     
     int32_t win_width = 640, win_height = 320;
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 4 );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 5 );
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
+    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
     glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
     glfwWindowHint( GLFW_SAMPLES, 4 );
     state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
@@ -344,12 +355,13 @@ frame( app_state_t* state )
         
         cur_loc = msh_vec3( -1, 0, -2 );
         dd_set_color( primitives, *color );
-        dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI * 0.8f );
+        dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI*0.8 );
         
         cur_loc = msh_vec3( 1, 0, -2 );
         dd_set_color( primitives, *color );
         dd_sphere( primitives, cur_loc.data, 0.5f );
-        
+ 
+
         cur_loc = msh_vec3( 3, 0, -2 );
         dd_set_color( primitives, *color );
         dd_torus( primitives, cur_loc.data, 0.5f, 0.1f );
