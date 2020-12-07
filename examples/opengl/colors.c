@@ -22,7 +22,7 @@ static const char *PROGRAM_NAME = "dbgdraw_colors";
 #define DD_GL_VERSION_MAJOR 4
 #define DD_GL_VERSION_MINOR 5
 #else
-#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL45!"
+#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL_45!"
 #endif
 
 typedef struct {

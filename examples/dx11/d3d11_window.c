@@ -11,7 +11,7 @@
 #include <d3dcompiler.h>
 #include <dxgi.h>
 
-#include "d3d11_utils.h"
+#include "d3d11_window.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -167,23 +167,6 @@ d3d11_present(d3d11_t* d3d11)
     }
   }
 }
-
-ID3DBlob*
-d3d11_complie_shader(const char* src, const char* target)
-{
-  ID3DBlob* output = NULL;
-  ID3DBlob* errors = NULL;
-  UINT flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_OPTIMIZATION_LEVEL3;
-  D3DCompile(src, strlen(src), NULL, NULL, NULL, "main", target, flags, 0, &output, &errors);
-  if( errors )
-  {
-    printf("%s\n", (char*)ID3D10Blob_GetBufferPointer(errors));
-    ID3D10Blob_Release(errors); errors = NULL;
-    return NULL;
-  }
-  return output;
-}
-
 
 static LRESULT CALLBACK d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
 {

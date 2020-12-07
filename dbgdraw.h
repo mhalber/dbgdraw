@@ -532,8 +532,6 @@ typedef enum dd_error
   DBGDRAW_ERR_COUNT
 } dd_err_code_t;
 
-typedef struct dd_render_backend dd_render_backend_t;
-
 typedef struct dd_context_desc
 {
   int32_t max_vertices;
@@ -560,9 +558,7 @@ typedef struct dd_new_frame_info
 
 typedef struct dd_instance_data
 {
-  /* TODO(maciej): dd_vec4_t quat; */
   dd_vec3_t position;
-  /* TODO(maciej): float size; */
   dd_color_t color;
 } dd_instance_data_t;
 
@@ -653,7 +649,7 @@ typedef struct dd_ctx_t
 #endif
 
   /* Render backend */
-  dd_render_backend_t *backend;
+  void *render_backend;
   int32_t drawcall_count;
   dd_vec2_t aa_radius;
   uint8_t enable_depth_test;
@@ -664,6 +660,7 @@ typedef struct dd_ctx_t
   float *cosf_lut;
   float lut_gamma;
   uint32_t lut_size;
+  
 } dd_ctx_t;
 
 #ifdef __cplusplus
@@ -751,17 +748,6 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
 
   ctx->instance_cap = DD_MAX(512, desc->max_instances);
 
-#if DBGDRAW_HAS_TEXT_SUPPORT
-  ctx->fonts_len = 0;
-  ctx->fonts_cap = DD_MAX(8, desc->max_fonts);
-  ctx->fonts = DBGDRAW_MALLOC(ctx->fonts_cap * sizeof(dd_font_data_t));
-  if (!ctx->fonts)
-  {
-    return DBGDRAW_ERR_FAILED_ALLOC;
-  }
-  DBGDRAW_MEMSET(ctx->fonts, 0, ctx->fonts_cap * sizeof(dd_font_data_t));
-#endif /* DBGDRAW_HAS_TEXT_SUPPORT */
-
   ctx->cur_cmd = NULL;
   ctx->color = (dd_color_t){0, 0, 0, 255};
   ctx->detail_level = DD_MAX(desc->detail_level, 0);
@@ -774,6 +760,17 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
   ctx->enable_depth_test = desc->enable_depth_test;
 
   dd_backend_init(ctx);
+
+#if DBGDRAW_HAS_TEXT_SUPPORT
+  ctx->fonts_len = 0;
+  ctx->fonts_cap = DD_MAX(8, desc->max_fonts);
+  ctx->fonts = malloc(ctx->fonts_cap * sizeof(dd_font_data_t));
+  if (!ctx->fonts)
+  {
+    return DBGDRAW_ERR_FAILED_ALLOC;
+  }
+  DBGDRAW_MEMSET(ctx->fonts, 0, ctx->fonts_cap * sizeof(dd_font_data_t));
+#endif /* DBGDRAW_HAS_TEXT_SUPPORT */
 
 #ifdef DBGDRAW_USE_DEFAULT_FONT
   if ( desc->enable_default_font)

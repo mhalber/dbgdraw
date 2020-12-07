@@ -94,7 +94,6 @@ int32_t init( app_state_t* state ) {
     .max_commands = 16,
     .detail_level = 2,
     .enable_frustum_cull = false,
-    // .enable_depth_test = true,
     .enable_default_font = 1
   };
   error = dd_init( state->dd_ctx, &desc );

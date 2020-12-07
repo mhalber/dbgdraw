@@ -1970,11 +1970,12 @@ msh_frustum( msh_scalar_t left,   msh_scalar_t right,
     msh_scalar_t d      = -(2.0f * z_far * z_near ) / z_diff;
     
     msh_mat4_t o = {{ (2.0f*z_near)/x_diff,                 0.0f, 0.0f,  0.0f,
-            0.0f, (2.0f*z_near)/y_diff, 0.0f,  0.0f,
-            a,                    b,    c, -1.0f,
-            0.0f,                 0.0f,    d,  0.0f }};
+                        0.0f, (2.0f*z_near)/y_diff, 0.0f,  0.0f,
+                        a,                    b,    c, -1.0f,
+                        0.0f,                 0.0f,    d,  0.0f }};
     return o;
 }
+
 
 MSHVMDEF msh_mat4_t
 msh_perspective( msh_scalar_t fovy,

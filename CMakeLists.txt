@@ -9,7 +9,7 @@ find_package( GLFW3 REQUIRED )
 
 set( EXAMPLES_DIR "${CMAKE_SOURCE_DIR}/examples")
 
-include_directories( "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/external" "${EXAMPLES_DIR}/opengl45" ${GLFW3_INCLUDE_DIR} )
+include_directories( "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/external" "${EXAMPLES_DIR}/opengl" ${GLFW3_INCLUDE_DIR} )
 
 set( COMMON_SRCS "${CMAKE_SOURCE_DIR}/external/glad45.c" "${CMAKE_SOURCE_DIR}/dbgdraw.c" )
 
@@ -17,9 +17,9 @@ set( TARGETS "basic" "bezier" "colors" "frustum_culling" "lines" "primitives" "t
 
 foreach( TARGET ${TARGETS} )
   message( STATUS "dbgdraw_${TARGET}" )
-  add_executable( "dbgdraw_${TARGET}" "${EXAMPLES_DIR}/opengl45/${TARGET}.c" ${COMMON_SRCS} )
+  add_executable( "dbgdraw_${TARGET}" "${EXAMPLES_DIR}/opengl/${TARGET}.c" ${COMMON_SRCS} )
   target_link_libraries( "dbgdraw_${TARGET}" ${GLFW3_LIBRARY} ${OPENGL_gl_LIBRARY} )
   if (MSVC)
-    target_compile_options( "dbgdraw_${TARGET}" PRIVATE -wd4996 )
+    target_compile_options( "dbgdraw_${TARGET}" PRIVATE -wd4996 -MD )
   endif()
 endforeach( TARGET ) 

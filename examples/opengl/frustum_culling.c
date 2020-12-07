@@ -29,9 +29,9 @@ static const char *PROGRAM_NAME = "dbgdraw_frustum_culling";
 
 
 typedef struct {
-    GLFWwindow* window;
-    dd_ctx_t* dd_ctx;
-    msh_camera_t* camera;
+  GLFWwindow* window;
+  dd_ctx_t* dd_ctx;
+  msh_camera_t* camera;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -41,14 +41,14 @@ void cleanup( app_state_t* state );
 
 typedef struct input
 {
-    uint8_t keyboard[256];
-    uint8_t mouse_buttons[32];
-    double cur_xpos;
-    double cur_ypos;
-    double prev_xpos;
-    double prev_ypos;
-    float scroll_x;
-    float scroll_y;
+  uint8_t keyboard[256];
+  uint8_t mouse_buttons[32];
+  double cur_xpos;
+  double cur_ypos;
+  double prev_xpos;
+  double prev_ypos;
+  float scroll_x;
+  float scroll_y;
 } input_t;
 
 static input_t input;
@@ -56,116 +56,116 @@ static input_t input;
 void
 mouse_button_callback( GLFWwindow* window, int32_t button, int32_t action, int32_t mods )
 {
-    (void) window;
-    (void) mods;
-    input.mouse_buttons[button] = (action == GLFW_RELEASE ) ? 0 : 1;
+  (void) window;
+  (void) mods;
+  input.mouse_buttons[button] = (action == GLFW_RELEASE ) ? 0 : 1;
 }
 
 void
 scroll_callback( GLFWwindow* window, double xoffset, double yoffset )
 {
-    (void) window;
-    input.scroll_x = (float)xoffset;
-    input.scroll_y = (float)yoffset;
+  (void) window;
+  input.scroll_x = (float)xoffset;
+  input.scroll_y = (float)yoffset;
 }
 
 void
 key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods)
 {
-    (void) window;
-    (void) mods;
-    (void) scancode;
-    if( key < 256 ) { input.keyboard[key] = (action == GLFW_RELEASE) ? 0 : 1; }
+  (void) window;
+  (void) mods;
+  (void) scancode;
+  if( key < 256 ) { input.keyboard[key] = (action == GLFW_RELEASE) ? 0 : 1; }
 }
 
 int32_t
 main( void )
 {
-    int32_t error    = 0;
-    app_state_t* state    = calloc( 1, sizeof(app_state_t) );
+  int32_t error    = 0;
+  app_state_t* state    = calloc( 1, sizeof(app_state_t) );
+  
+  GLFWwindow* window    = NULL;
+  dd_ctx_t* dd_ctx = NULL;
+  
+  error = init( state );
+  if( error ) { goto main_return; }
+  
+  window  = state->window;
+  dd_ctx  = state->dd_ctx;
+  
+  while( !glfwWindowShouldClose( window ) )
+  {
+    frame( state );
     
-    GLFWwindow* window    = NULL;
-    dd_ctx_t* dd_ctx = NULL;
-    
-    error = init( state );
-    if( error ) { goto main_return; }
-    
-    window  = state->window;
-    dd_ctx  = state->dd_ctx;
-    
-    while( !glfwWindowShouldClose( window ) )
-    {
-        frame( state );
-        
-        glfwSwapBuffers( window );
-        glfwPollEvents();
-    }
-    
-    main_return:
-    dd_term( dd_ctx );
-    glfwTerminate();
-    free( state );
-    return error;
+    glfwSwapBuffers( window );
+    glfwPollEvents();
+  }
+  
+  main_return:
+  dd_term( dd_ctx );
+  glfwTerminate();
+  free( state );
+  return error;
 }
 
 int32_t
 init( app_state_t* state )
 {
-    int32_t error = 0;
+  int32_t error = 0;
+  
+  error = !(glfwInit());
+  if( error )
+  {
+    fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
+    return 1;
+  }
     
-    error = !(glfwInit());
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
-        return 1;
-    }
+  int32_t win_width = 640, win_height = 320;
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
+  glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_SAMPLES, 4);
+  state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
+  if( !state->window )
+  {
+    fprintf( stderr, "[ERROR] Failed to create window\n" );
+    return 1;
+  }
+  glfwSetMouseButtonCallback( state->window, mouse_button_callback);
+  glfwSetScrollCallback( state->window, scroll_callback );
+  glfwSetKeyCallback( state->window, key_callback);
+  glfwMakeContextCurrent( state->window );
+  
+  if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
+  {
+    fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
+    return 1;
+  }
     
-    int32_t win_width = 640, win_height = 320;
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
-    state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
-    if( !state->window )
-    {
-        fprintf( stderr, "[ERROR] Failed to create window\n" );
-        return 1;
-    }
-    glfwSetMouseButtonCallback( state->window, mouse_button_callback);
-    glfwSetScrollCallback( state->window, scroll_callback );
-    glfwSetKeyCallback( state->window, key_callback);
-    glfwMakeContextCurrent( state->window );
+  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+  dd_ctx_desc_t desc = { .max_vertices = 1024*200,
+                         .max_commands = 16,
+                         .detail_level = 2,
+                         .enable_frustum_cull = true,
+                         .enable_depth_test = true };
+  error = dd_init( state->dd_ctx, &desc );
     
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
-        return 1;
-    }
+  if( error )
+  {
+    fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
+    return 1;
+  }
     
-    state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
-    dd_ctx_desc_t desc = { .max_vertices = 1024*200,
-        .max_commands = 16,
-        .detail_level = 2,
-        .enable_frustum_cull = true,
-        .enable_depth_test = true };
-    error = dd_init( state->dd_ctx, &desc );
-    
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
-        return 1;
-    }
-    
-    state->camera = calloc( 1, sizeof(msh_camera_t) );
-    msh_camera_init( state->camera, &(msh_camera_desc_t)
-                    { .eye = msh_vec3( -6.0f, 2.5f, -6.0f ),
-                        .center = msh_vec3_zeros(),
-                        .up = msh_vec3_posy(),
-                        .viewport = msh_vec4( 0.0f, 0.0f, (float)win_width, (float)win_height),
-                        .fovy = (float)msh_rad2deg( 60.0f ),
-                        .znear = 0.01f,
-                        .zfar = 100.0f,
-                        .use_ortho = false } );
+  state->camera = calloc( 1, sizeof(msh_camera_t) );
+  msh_camera_init( state->camera, &(msh_camera_desc_t)
+                  { .eye = msh_vec3( -6.0f, 2.5f, -6.0f ),
+                    .center = msh_vec3_zeros(),
+                    .up = msh_vec3_posy(),
+                    .viewport = msh_vec4( 0.0f, 0.0f, (float)win_width, (float)win_height),
+                    .fovy = (float)msh_rad2deg( 60.0f ),
+                    .znear = 0.01f,
+                    .zfar = 100.0f,
+                    .use_ortho = false } );
     return 0;
 }
 

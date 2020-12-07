@@ -127,8 +127,8 @@ dd__gl_link_program(GLuint vertex_shader, GLuint geometry_shader, GLuint fragmen
 #define DBGDRAW_SHADER_HEADER "#version 450 core\n"
 #define DBGDRAW_STRINGIFY(x) #x
 
-void init_base_shaders_source(const char **vert_shdr, const char **frag_shdr_src);
-void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src);
+void dd__init_base_shaders_source(const char **vert_shdr, const char **frag_shdr_src);
+void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src);
 
 int32_t
 dd_backend_init(dd_ctx_t *ctx)
@@ -138,7 +138,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   const char *base_vert_shdr_src = NULL;
   const char *base_frag_shdr_src = NULL;
-  init_base_shaders_source(&base_vert_shdr_src, &base_frag_shdr_src);
+  dd__init_base_shaders_source(&base_vert_shdr_src, &base_frag_shdr_src);
 
   GLuint vertex_shader = dd__gl_compile_shader_src(GL_VERTEX_SHADER, base_vert_shdr_src);
   GLuint fragment_shader = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, base_frag_shdr_src);
@@ -146,7 +146,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   const char *line_vert_shdr_src = NULL;
   const char *line_frag_shdr_src = NULL;
-  init_line_shaders_source(&line_vert_shdr_src, &line_frag_shdr_src);
+  dd__init_line_shaders_source(&line_vert_shdr_src, &line_frag_shdr_src);
 
   GLuint vertex_shader2 = dd__gl_compile_shader_src(GL_VERTEX_SHADER, line_vert_shdr_src);
   GLuint fragment_shader2 = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, line_frag_shdr_src);
@@ -375,7 +375,7 @@ dd_backend_term(dd_ctx_t *ctx)
   return DBGDRAW_ERR_OK;
 }
 
-void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
+void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
 {
   *vert_shdr_src =
     DBGDRAW_SHADER_HEADER
@@ -436,7 +436,7 @@ void init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr
       });
 }
 
-void init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
+void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
 {
   *vert_shdr_src =
     DBGDRAW_SHADER_HEADER

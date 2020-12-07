@@ -1,12 +1,13 @@
 /* This file is modelled after the d3d11entry.h from sokol_gfx, by Andre Weissflog (@floooh)*/
 
-#ifndef D3D11_UTILS
-#define D3D11_UTILS
+#ifndef D3D11_WINDOW
+#define D3D11_WINDOW
 
 #include <stdint.h>
 #include <stdbool.h>
 
-#define STRINGIFY(x) #x
+//TODO(maciej): Handle events WM_MOUSELEAVE, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, WM_CHAR
+//TODO(maciej): Handle resizing
 
 typedef struct d3d11_desc
 {
@@ -40,9 +41,5 @@ bool d3d11_process_events();
 void d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a);
 void d3d11_present(d3d11_t* d3d11);
 
-ID3DBlob* d3d11_complie_shader(const char* source, const char* target);
-//TODO(maciej): Upload texture?
 
-
-
-#endif /*D3D11_UTILS*/
+#endif /*D3D11_WINDOW*/
