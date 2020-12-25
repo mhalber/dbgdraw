@@ -159,7 +159,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   backend.vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
   GLCHECK(glNamedBufferData(backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW));
-  backend.ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
+  backend.ibo_size = 512 * sizeof(dd_instance_data_t);
   GLCHECK(glNamedBufferData(backend.ibo, backend.ibo_size, NULL, GL_DYNAMIC_DRAW));
 
   GLCHECK(glCreateTextures(GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id));
@@ -172,7 +172,6 @@ dd_backend_init(dd_ctx_t *ctx)
 
   GLuint instance_pos_loc = glGetAttribLocation(backend.base_program, "in_instance_pos");
   GLuint instance_col_loc = glGetAttribLocation(backend.base_program, "in_instance_col");
-
 
   GLCHECK(glVertexArrayVertexBuffer(backend.vao, bind_idx, backend.vbo, 0, sizeof(dd_vertex_t)));
 
@@ -248,15 +247,14 @@ dd_backend_render(dd_ctx_t *ctx)
 
     if (cmd->instance_count && cmd->instance_data)
     {
-      if (ctx->backend->ibo_size < ctx->instance_cap * sizeof(dd_instance_data_t))
+      if (ctx->backend->ibo_size < cmd->instance_count * sizeof(dd_instance_data_t))
       {
-        ctx->instance_cap = cmd->instance_count;
+        ctx->instance_cap = cmd->instace_count;
         ctx->backend->ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
         GLCHECK(glNamedBufferData(ctx->backend->ibo, ctx->backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
       }
       GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, ctx->backend->ibo_size, cmd->instance_data));
     }
-
 
     if (cmd->draw_mode == DBGDRAW_MODE_FILL)
     {
@@ -403,6 +401,7 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
         }
         else
         {
+          // TODO(maciej): Normal matrix
           v_uv_or_normal = vec3(u_mvp * vec4(in_uv_or_normal, 0.0));
         }
         v_shading_type = shading_type;

@@ -45,7 +45,8 @@ int main(int argc, char** argv)
     .max_vertices = 32,
     .max_commands = 16,
     .detail_level = 2,
-    .enable_frustum_cull = false
+    .enable_frustum_cull = false,
+    .enable_depth_test = true
   };
   
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
@@ -84,22 +85,56 @@ int main(int argc, char** argv)
     msh_vec3_t p2 = msh_vec3( 1.0,  1.0, 0.0);
     msh_vec3_t p3 = msh_vec3( 1.0, -1.0, 0.0);
 
-    msh_vec3_t p4 = msh_vec3(-1.0f, -1.0f, -0.2f);
-    msh_vec3_t p5 = msh_vec3(-1.0f,  1.0f, -0.2f);
-    msh_vec3_t p6 = msh_vec3( 1.0f,  1.0f, -0.2f);
-    msh_vec3_t p7 = msh_vec3( 1.0f, -1.0f, -0.2f);
+    msh_vec3_t p4 = msh_vec3(-1.0f, -1.0f, -0.1f);
+    msh_vec3_t p5 = msh_vec3(-1.0f,  1.0f, -0.1f);
+    msh_vec3_t p6 = msh_vec3( 1.0f,  1.0f, -0.1f);
+    msh_vec3_t p7 = msh_vec3( 1.0f, -1.0f, -0.1f);
+
+    msh_vec3_t zero_pt = msh_vec3_zeros();
+
+    dd_instance_data_t instances[] = 
+    {
+      [0] = { .position = { 1.0, 0.0,  1.0}, .color = DBGDRAW_CYAN },  
+      [1] = { .position = {-1.0, 0.0,  1.0}, .color = DBGDRAW_MAGENTA },  
+      [2] = { .position = {-1.0, 0.0, -1.0}, .color = DBGDRAW_YELLOW },  
+      [3] = { .position = { 1.0, 0.0, -1.0}, .color = DBGDRAW_GRAY },  
+    };
 
     dd_new_frame( &dd_ctx, &info );
 
+    dd_set_detail_level( &dd_ctx, 2 );
+    dd_set_shading_type( &dd_ctx, DBGDRAW_SHADING_SOLID );
     dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_FILL );
+    dd_set_instance_data( &dd_ctx, sizeof(instances)/sizeof(instances[0]), instances );
+    dd_set_color( &dd_ctx, DBGDRAW_BLACK );
+    dd_sphere( &dd_ctx, zero_pt.data, 0.05f);
+    dd_end_cmd( &dd_ctx );
 
+    dd_set_shading_type( &dd_ctx, DBGDRAW_SHADING_NONE );
+    dd_set_detail_level( &dd_ctx, 1 );
+    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_FILL );
     dd_set_color( &dd_ctx, DBGDRAW_BLUE );
     dd_quad( &dd_ctx, p4.data, p5.data, p6.data, p7.data);
-
-    dd_set_color( &dd_ctx, dd_rgbaf(1.0f, 0.5f, 0.0f, 0.5f) );
-    dd_quad( &dd_ctx, p0.data, p1.data, p2.data, p3.data);
-    
     dd_end_cmd( &dd_ctx );
+
+    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_STROKE );
+    dd_set_color( &dd_ctx, dd_rgbaf(1.0f, 0.6f, 0.0f, 1.0f) );
+    dd_quad( &dd_ctx, p0.data, p1.data, p2.data, p3.data);
+    dd_end_cmd( &dd_ctx );
+
+    dd_set_primitive_size( &dd_ctx, 6.0f );
+    dd_set_color( &dd_ctx, DBGDRAW_WHITE );
+    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_POINT );
+    dd_quad( &dd_ctx, p0.data, p1.data, p2.data, p3.data);
+    dd_end_cmd( &dd_ctx );
+
+    dd_set_primitive_size( &dd_ctx, 8.0f );
+    dd_set_detail_level( &dd_ctx, 2 );
+    dd_set_color( &dd_ctx, DBGDRAW_GREEN );
+    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_POINT );
+    dd_circle2d( &dd_ctx, p2.data, 0.2f );
+    dd_end_cmd( &dd_ctx );
+
     dd_render( &dd_ctx );
 
     d3d11_present(d3d11);
