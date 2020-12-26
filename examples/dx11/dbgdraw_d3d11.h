@@ -34,9 +34,10 @@ typedef struct dd_render_backend
 typedef struct dd_base_cb_data
 {
   dd_mat4_t mvp;
+  dd_vec4_t viewport;
   int shading_type;
   int base_index;
-  dd_vec4_t viewport;
+  int instancing_enabled;
 } dd_cb_data_t;
 
 ID3DBlob* dd__d3d11_complie_shader( const char* source, const char* target, const char* main );
@@ -311,6 +312,8 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
 
   ID3D11Buffer* null_buffer = NULL;
   ID3D11InputLayout* null_layout = NULL;
+  UINT strides[2] = {sizeof(dd_vertex_t), sizeof(dd_instance_data_t)};
+  UINT offsets[2] = {0, 0};
   for (int32_t i = 0; i < ctx->commands_len; ++i)
   {
     dd_cmd_t* cmd = ctx->commands + i;
@@ -319,7 +322,6 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     if (cmd->instance_count && cmd->instance_data )
     {
       num_buffers = 2;
-
       // TODO(maciej): Set instances dirty somehow?
       D3D11_MAPPED_SUBRESOURCE instance_buffer_data = {0};
       ID3D11DeviceContext_Map( d3d11->device_context, (ID3D11Resource*)backend->instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instance_buffer_data );
@@ -332,9 +334,10 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     dd_cb_data_t cb_data = 
     { 
       .mvp = mvp, 
+      .viewport = ctx->viewport,
       .shading_type = cmd->shading_type, 
       .base_index = cmd->base_index,
-      .viewport = ctx->viewport
+      .instancing_enabled = (int)(cmd->instance_count && cmd->instance_data)
     };
 
     ID3D11DeviceContext_Map( d3d11->device_context, (ID3D11Resource*)backend->base_constant_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer_data );
@@ -345,9 +348,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
 
     if (cmd->draw_mode == DBGDRAW_MODE_FILL || cmd->draw_mode == DBGDRAW_MODE_STROKE)
     {
-      UINT strides[2] = {sizeof(dd_vertex_t), sizeof(dd_instance_data_t)};
-      UINT offsets[2] = {0, 0};
-      ID3D11Buffer* buffers[2] = { backend->vertex_buffer, backend->instance_buffer };
+      ID3D11Buffer* buffers[] = { backend->vertex_buffer, backend->instance_buffer };
 
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, backend->base_input_layout);  
       ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, num_buffers, buffers, strides, offsets );
@@ -363,19 +364,18 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     }
     else
     {
-      UINT strides = sizeof(dd_vertex_t);
-      UINT offsets = 0;
+      ID3D11ShaderResourceView* buffer_views[] = {backend->vertex_buffer_view, backend->instance_buffer_view};
       ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, null_layout);  
-      ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, 1, &null_buffer, &strides, &offsets );
+      ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, 1, &null_buffer, strides, offsets );
 
-      ID3D11DeviceContext_VSSetShaderResources(d3d11->device_context, 0, 1, &backend->vertex_buffer_view);
-      ID3D11DeviceContext_VSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
+      ID3D11DeviceContext_VSSetShaderResources(d3d11->device_context, 0, num_buffers, buffer_views);
       ID3D11DeviceContext_VSSetShader(d3d11->device_context, backend->point_vs, NULL, 0);
 
       ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->point_ps, NULL, 0);
-      ID3D11DeviceContext_Draw(d3d11->device_context, 6*cmd->vertex_count, 0);
+      if (cmd->instance_count ) ID3D11DeviceContext_DrawInstanced(d3d11->device_context, 6*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
+      else                      ID3D11DeviceContext_Draw(d3d11->device_context, 6*cmd->vertex_count, 0);
     }
   }  
   return DBGDRAW_ERR_OK;
@@ -418,9 +418,10 @@ dd__init_fill_shader_source( const char** shdr_src )
     cbuffer vs_uniforms
     {
       float4x4 mvp;
+      float4 viewport;
       int shading_type;
       int base_index;
-      float4 viewport;
+      int instancing_enabled;
     };
     
     struct vs_in {
@@ -439,22 +440,20 @@ dd__init_fill_shader_source( const char** shdr_src )
     };
 
     vs_out vs_main( vs_in input ) {
-      float3 pos = input.instance_pos + input.pos_size.xyz;
+      float3 pos = float3(0.0, 0.0, 0.0);
+      float4 color = float4(0.0, 0.0, 0.0, 0.0);
       float3 uv_or_normal = float3(0.0, 0.0, 0.0);
-      if (shading_type == 0)
-      {
-        uv_or_normal = input.uv_or_normal;
-      }
-      else
-      {
-        // TODO(maciej): Normal matrix
-        uv_or_normal = mul(mvp, float4(input.uv_or_normal, 0.0)).xyz;
-      }
+
+      if (instancing_enabled == 1) { pos = input.instance_pos + input.pos_size.xyz; color = input.instance_color + input.color;}
+      else                         { pos = input.pos_size.xyz; color = input.color; }
+      if (shading_type == 0)       { uv_or_normal = input.uv_or_normal; }
+      else                         { uv_or_normal = mul(mvp, float4(input.uv_or_normal, 0.0)).xyz; } // TODO(maciej): Normal matrix
+    
 
       vs_out output;
       output.pos = mul( mvp, float4(pos, 1.0f) );
       output.uv_or_normal = uv_or_normal;
-      output.color = input.color + input.instance_color;
+      output.color = color;
       return output;
     } 
 
@@ -478,14 +477,16 @@ dd__init_point_shader_source( const char** shdr_src )
 {
   *shdr_src = DBGDRAW_D3D11_STRINGIFY(
     
-    ByteAddressBuffer data : register(t0);
+    ByteAddressBuffer vertex_data : register(t0);
+    ByteAddressBuffer instance_data : register(t1);
 
     cbuffer vs_uniforms
     {
       float4x4 mvp;
+      float4 viewport;
       int shading_type;
       int base_index;
-      float4 viewport;
+      int instancing_enabled;
     };
   
     struct vs_out {
@@ -500,38 +501,66 @@ dd__init_point_shader_source( const char** shdr_src )
       float4 color;
     };
 
-    vertex load_vertex( uint idx )
+    struct instance {
+      float3 pos;
+      float4 color;
+    };
+
+    float4 unpack_color( uint packed_color )
     {
-      float4 data_a = asfloat(data.Load4( idx ));
-      float3 data_b = asfloat(data.Load3( idx + 16 ));
-      uint data_c = data.Load(idx + 28);
-      
-      uint ru8 = data_c       & 0xff;
-      uint gu8 = data_c >>  8 & 0xff;
-      uint bu8 = data_c >> 16 & 0xff;
-      uint au8 = data_c >> 24 & 0xff;
+      uint ru8 = packed_color       & 0xff;
+      uint gu8 = packed_color >>  8 & 0xff;
+      uint bu8 = packed_color >> 16 & 0xff;
+      uint au8 = packed_color >> 24 & 0xff;
 
       float r = (float)ru8 / 255.0f;
       float g = (float)gu8 / 255.0f;
       float b = (float)bu8 / 255.0f;
       float a = (float)au8 / 255.0f;
 
+      return float4(r,g,b,a);
+    }
+
+    vertex load_vertex( uint idx )
+    {
+      float4 data_a = asfloat(vertex_data.Load4( idx ));
+      float3 data_b = asfloat(vertex_data.Load3( idx + 16 ));
+      uint data_c = vertex_data.Load(idx + 28);
+      
       vertex v;
       v.pos = data_a.xyz;
       v.size = data_a.w;
       v.normal_uv = data_b.xyz;
-      v.color = float4(r,g,b,a);
+      v.color = unpack_color( data_c );
       return v;
     }
 
-    vs_out vs_main( uint idx : SV_VertexID ) {
+    instance load_instance( uint idx )
+    {
+      float3 pos_data = asfloat(instance_data.Load3(idx));
+      uint color_data = instance_data.Load(idx+12);
+
+      instance i;
+      i.pos = pos_data;
+      i.color = unpack_color(color_data);
+      return i;
+    }
+
+    vs_out vs_main( uint idx : SV_VertexID, uint instance_idx : SV_InstanceID ) {
 
       float width  = viewport.z - viewport.x;
       float height = viewport.w - viewport.y;
       vertex v = load_vertex( (base_index + idx/6)*32 );
+    
+      if (instancing_enabled == 1)
+      {
+        instance i = load_instance( instance_idx * 16 );
+        v.pos = v.pos + i.pos;
+        v.color = v.color + i.color;
+      }
 
       float2 offsets[6];
-      offsets[0] = float2(-v.size, -v.size);
+      offsets[0] = float2(-v.size, -v.size);// Note(maciej): Divide by 2?
       offsets[1] = float2(-v.size,  v.size);
       offsets[2] = float2( v.size, -v.size);
 
