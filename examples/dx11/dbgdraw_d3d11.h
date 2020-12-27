@@ -1,6 +1,8 @@
 #ifndef DBGDRAW_D3D11_H
 #define DBGDRAW_D3D11_H
 
+#define DBGDRAW_D3D11_MAX_FONTS 16
+
 typedef struct dd_render_backend
 {
   const d3d11_t* d3d11;
@@ -25,10 +27,13 @@ typedef struct dd_render_backend
 
   ID3D11Buffer* base_constant_buffer;
 
-  ID3D11VertexShader* line_vs;
-  ID3D11PixelShader* line_ps;
-  ID3D11Buffer* line_cb;
+#if DBGDRAW_HAS_TEXT_SUPPORT
+  ID3D11SamplerState* font_texture_sampler;
 
+  int32_t font_texture_count;
+  ID3D11Texture2D* font_textures[DBGDRAW_D3D11_MAX_FONTS];
+  ID3D11ShaderResourceView* font_textures_views[DBGDRAW_D3D11_MAX_FONTS];
+#endif
 } dd_render_backend_t;
 
 typedef struct dd_base_cb_data
@@ -40,7 +45,7 @@ typedef struct dd_base_cb_data
   int instancing_enabled;
 } dd_cb_data_t;
 
-ID3DBlob* dd__d3d11_complie_shader( const char* source, const char* target, const char* main );
+ID3DBlob* dd__d3d11_compile_shader( const char* source, const char* target, const char* main );
 
 void dd__init_fill_shader_source( const char **shdr_src );
 void dd__init_stroke_shader_source( const char **shdr_src );
@@ -50,6 +55,7 @@ int32_t dd_backend_init( dd_ctx_t* ctx );
 int32_t dd_backend_term( dd_ctx_t* ctx );
 int32_t dd_backend_render( dd_ctx_t* ctx );
 int32_t dd_backend_init_font_texture( dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id );
+
 
 int32_t 
 dd_backend_init( dd_ctx_t* ctx )
@@ -64,7 +70,7 @@ dd_backend_init( dd_ctx_t* ctx )
   dd__init_point_shader_source( &point_shd_src );
 
   // Compile fill vertex shader
-  ID3D10Blob* fill_vs_binary = dd__d3d11_complie_shader( fill_shd_src, "vs_5_0", "vs_main" );
+  ID3D10Blob* fill_vs_binary = dd__d3d11_compile_shader( fill_shd_src, "vs_5_0", "vs_main" );
   hr = ID3D11Device_CreateVertexShader(d3d11->device, 
                                        ID3D10Blob_GetBufferPointer(fill_vs_binary), 
                                        ID3D10Blob_GetBufferSize(fill_vs_binary), 
@@ -73,7 +79,7 @@ dd_backend_init( dd_ctx_t* ctx )
   assert(SUCCEEDED(hr));
 
   // Compile fill pixel shader
-  ID3D10Blob* fill_ps_binary = dd__d3d11_complie_shader( fill_shd_src, "ps_5_0", "ps_main" );
+  ID3D10Blob* fill_ps_binary = dd__d3d11_compile_shader( fill_shd_src, "ps_5_0", "ps_main" );
   hr = ID3D11Device_CreatePixelShader(d3d11->device, 
                                       ID3D10Blob_GetBufferPointer( fill_ps_binary ),
                                       ID3D10Blob_GetBufferSize( fill_ps_binary ),
@@ -107,7 +113,7 @@ dd_backend_init( dd_ctx_t* ctx )
 
 
   // Compile point vertex shader
-  ID3D10Blob* point_vs_binary = dd__d3d11_complie_shader( point_shd_src, "vs_5_0", "vs_main" );
+  ID3D10Blob* point_vs_binary = dd__d3d11_compile_shader( point_shd_src, "vs_5_0", "vs_main" );
   hr = ID3D11Device_CreateVertexShader(d3d11->device, 
                                        ID3D10Blob_GetBufferPointer(point_vs_binary), 
                                        ID3D10Blob_GetBufferSize(point_vs_binary), 
@@ -116,7 +122,7 @@ dd_backend_init( dd_ctx_t* ctx )
   assert(SUCCEEDED(hr));
 
   // Compile point pixel shader
-  ID3D10Blob* point_ps_binary = dd__d3d11_complie_shader( point_shd_src, "ps_5_0", "ps_main" );
+  ID3D10Blob* point_ps_binary = dd__d3d11_compile_shader( point_shd_src, "ps_5_0", "ps_main" );
   hr = ID3D11Device_CreatePixelShader(d3d11->device, 
                                       ID3D10Blob_GetBufferPointer( point_ps_binary ),
                                       ID3D10Blob_GetBufferSize( point_ps_binary ),
@@ -190,6 +196,19 @@ dd_backend_init( dd_ctx_t* ctx )
   hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->instance_buffer, &ib_view_desc, &backend->instance_buffer_view);
   assert(SUCCEEDED(hr));
 
+  // Setup sampler    
+  D3D11_SAMPLER_DESC sampler_desc = 
+  {
+    .Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR,
+    .AddressU       = D3D11_TEXTURE_ADDRESS_WRAP,
+    .AddressV       = D3D11_TEXTURE_ADDRESS_WRAP,
+    .AddressW       = D3D11_TEXTURE_ADDRESS_WRAP,
+    .ComparisonFunc = D3D11_COMPARISON_NEVER,
+  };
+
+  ID3D11Device_CreateSamplerState(d3d11->device, &sampler_desc, &backend->font_texture_sampler);
+
+
   // Setup rasterizer state
   D3D11_RASTERIZER_DESC rasterizer_state_desc = 
   {
@@ -229,7 +248,7 @@ dd_backend_init( dd_ctx_t* ctx )
   hr = ID3D11Device_CreateBlendState( d3d11->device, &blend_state_desc, &backend->blend_state );
   assert(SUCCEEDED(hr));
 
-  return 1;
+  return DBGDRAW_ERR_OK;
 }
 
 int32_t dd_backend_term(dd_ctx_t* ctx)
@@ -237,6 +256,9 @@ int32_t dd_backend_term(dd_ctx_t* ctx)
   dd_render_backend_t *backend = (dd_render_backend_t*)ctx->render_backend;
 
   ID3D11Buffer_Release( backend->vertex_buffer );
+  ID3D11Buffer_Release( backend->instance_buffer );
+  ID3D11ShaderResourceView_Release( backend->vertex_buffer_view );
+  ID3D11ShaderResourceView_Release( backend->instance_buffer_view );
 
   ID3D11RasterizerState_Release( backend->rasterizer_state );
   ID3D11BlendState_Release( backend->blend_state );
@@ -247,7 +269,14 @@ int32_t dd_backend_term(dd_ctx_t* ctx)
   ID3D11PixelShader_Release( backend->fill_ps );
   ID3D11Buffer_Release( backend->base_constant_buffer );
 
-  return 0;
+#if DBGDRAW_HAS_TEXT_SUPPORT
+  for (int32_t i = 0; i < backend->font_texture_count; ++i)
+  {
+    ID3D11Buffer_Release( backend->font_textures[i] );
+    ID3D11ShaderResourceView_Release( backend->font_textures_views[i] );
+  }
+#endif
+  return DBGDRAW_ERR_OK;
 }
 
 int32_t dd_backend_render(dd_ctx_t* ctx)
@@ -346,23 +375,38 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
 
     ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, topology_modes[cmd->draw_mode]);
 
-    if (cmd->draw_mode == DBGDRAW_MODE_FILL || cmd->draw_mode == DBGDRAW_MODE_STROKE)
+    if (cmd->draw_mode == DBGDRAW_MODE_FILL )
     {
       ID3D11Buffer* buffers[] = { backend->vertex_buffer, backend->instance_buffer };
 
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, backend->base_input_layout);  
       ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, num_buffers, buffers, strides, offsets );
 
-      ID3D11DeviceContext_VSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_VSSetShader(d3d11->device_context, backend->fill_vs, NULL, 0);
+      ID3D11DeviceContext_VSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
 
-      ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->fill_ps, NULL, 0);
-      if (cmd->instance_count ) ID3D11DeviceContext_DrawInstanced(d3d11->device_context, cmd->vertex_count, max(cmd->instance_count, 1), cmd->base_index, 0 );
-      else                      ID3D11DeviceContext_Draw( d3d11->device_context, cmd->vertex_count, cmd->base_index );
+      ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
+
+#if DBGDRAW_HAS_TEXT_SUPPORT
+      if (cmd->font_idx >= 0)
+      {
+        ID3D11DeviceContext_PSSetShaderResources(d3d11->device_context, 0, 1, &backend->font_textures_views[cmd->font_idx]);
+        ID3D11DeviceContext_PSSetSamplers(d3d11->device_context, 0, 1, &backend->font_texture_sampler);
+      }
+#endif
+
+      if (cmd->instance_count ) 
+      {
+        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, cmd->vertex_count, max(cmd->instance_count, 1), cmd->base_index, 0 );
+      }
+      else
+      {
+        ID3D11DeviceContext_Draw( d3d11->device_context, cmd->vertex_count, cmd->base_index );
+      }
 
     }
-    else
+    else if (cmd->draw_mode == DBGDRAW_MODE_POINT)
     {
       ID3D11ShaderResourceView* buffer_views[] = {backend->vertex_buffer_view, backend->instance_buffer_view};
       ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -374,26 +418,26 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
 
       ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->point_ps, NULL, 0);
-      if (cmd->instance_count ) ID3D11DeviceContext_DrawInstanced(d3d11->device_context, 6*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
-      else                      ID3D11DeviceContext_Draw(d3d11->device_context, 6*cmd->vertex_count, 0);
+      if (cmd->instance_count ) 
+      {
+        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, 6*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
+      }
+      else
+      {
+        ID3D11DeviceContext_Draw(d3d11->device_context, 6*cmd->vertex_count, 0);
+      }
+    }
+    else
+    {
+      // SKIP
     }
   }  
   return DBGDRAW_ERR_OK;
 }
 
-int32_t
-dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id)
-{
-  (void)ctx;
-  (void)data;
-  (void)width;
-  (void)height;
-  (void)tex_id;
-  return 0;
-}
 
 ID3DBlob*
-dd__d3d11_complie_shader(const char* src, const char* target, const char* main)
+dd__d3d11_compile_shader(const char* src, const char* target, const char* main)
 {
   ID3DBlob* output = NULL;
   ID3DBlob* errors = NULL;
@@ -408,12 +452,56 @@ dd__d3d11_complie_shader(const char* src, const char* target, const char* main)
   return output;
 }
 
+int32_t
+dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id)
+{
+#if DBGDRAW_HAS_TEXT_SUPPORT
+
+  // TODO(maciej): Change into error?
+  assert(ctx->fonts_cap <= DBGDRAW_D3D11_MAX_FONTS);
+
+  HRESULT hr;
+  dd_render_backend_t* backend = ctx->render_backend;
+  const d3d11_t* d3d11 = backend->d3d11;
+
+  // Create texture
+  D3D11_TEXTURE2D_DESC texture_desc = 
+  {
+    .Width = width,
+    .Height = height,
+    .MipLevels = 1,
+    .ArraySize = 1, // Would have to redesign api to make use of this
+    .Format = DXGI_FORMAT_R8_UNORM,
+    .SampleDesc = { .Count = 1 },
+    .Usage = D3D11_USAGE_IMMUTABLE,
+    .BindFlags = D3D11_BIND_SHADER_RESOURCE
+  };
+
+  D3D11_SUBRESOURCE_DATA texture_data =
+  {
+    .pSysMem = data,
+    .SysMemPitch = width,
+  };
+
+  int32_t cur_idx = backend->font_texture_count++;
+  *tex_id = cur_idx;
+  hr = ID3D11Device_CreateTexture2D(d3d11->device, &texture_desc, &texture_data, &(backend->font_textures[cur_idx]) );
+  assert(SUCCEEDED(hr));
+  hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->font_textures[cur_idx], NULL, &(backend->font_textures_views[cur_idx]));
+  assert(SUCCEEDED(hr));
+#endif
+
+  return DBGDRAW_ERR_OK;
+}
+
 #define DBGDRAW_D3D11_STRINGIFY(x) #x
 
 void
 dd__init_fill_shader_source( const char** shdr_src )
 {
   *shdr_src = DBGDRAW_D3D11_STRINGIFY(
+    Texture2D font_texture: register(t0);
+    SamplerState font_texture_sampler : register(s0);
     
     cbuffer vs_uniforms
     {
@@ -439,7 +527,7 @@ dd__init_fill_shader_source( const char** shdr_src )
       float4 color: COL;
     };
 
-    vs_out vs_main( vs_in input ) {
+    vs_out vs_main(vs_in input) {
       float3 pos = float3(0.0, 0.0, 0.0);
       float4 color = float4(0.0, 0.0, 0.0, 0.0);
       float3 uv_or_normal = float3(0.0, 0.0, 0.0);
@@ -457,10 +545,12 @@ dd__init_fill_shader_source( const char** shdr_src )
       return output;
     } 
 
-    float4 ps_main( vs_out input): SV_TARGET {
+    float4 ps_main(vs_out input): SV_TARGET {
         if (shading_type == 0)
         {
-           return input.color;
+          float texture_val = font_texture.Sample(font_texture_sampler, input.uv_or_normal.xy).r;
+          float alpha = min(input.color.a, texture_val);
+          return float4(input.color.rgb, alpha);
         }
         else
         {

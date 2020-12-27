@@ -14,6 +14,7 @@
 #include <d3dcompiler.h>
 #include <dxgi.h>
 
+#define DBGDRAW_USE_DEFAULT_FONT
 #include "stb_truetype.h"
 #include "dbgdraw.h"
 #include "d3d11_window.h"
@@ -46,34 +47,37 @@ int main(int argc, char** argv)
     .max_commands = 16,
     .detail_level = 2,
     .enable_frustum_cull = false,
-    .enable_depth_test = true
+    .enable_depth_test = true,
+    .enable_default_font = true
   };
   
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
   backend->d3d11 = d3d11;
   dd_ctx_t dd_ctx = {0};
   dd_ctx.render_backend = backend;
-  error = dd_init( &dd_ctx, &desc );
-  if( error )
+  error = dd_init(&dd_ctx, &desc);
+  if(error)
   {
-    fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
+    fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
     return 1;
   }
+
+
 
   while (d3d11_process_events())
   {
     // Begin default pass? How does sokol share that between _app and _gfx?
     D3D11_VIEWPORT vp = {0.0f, 0.0f, (FLOAT)d3d11->render_target_width, (FLOAT)d3d11->render_target_height, 0.0f, 1.0f};
-    ID3D11DeviceContext_OMSetRenderTargets(d3d11->device_context, 1, &d3d11->render_target_view, d3d11->depth_stencil_view );
+    ID3D11DeviceContext_OMSetRenderTargets(d3d11->device_context, 1, &d3d11->render_target_view, d3d11->depth_stencil_view);
     ID3D11DeviceContext_RSSetViewports(d3d11->device_context, 1, &vp);
-    d3d11_clear( d3d11, 0.2f, 0.2f, 0.2f, 1.0f );
+    d3d11_clear(d3d11, 0.2f, 0.2f, 0.2f, 1.0f);
 
-    msh_vec3_t cam_pos = msh_vec3( 0.8f, 2.6f, 3.0f );
-    msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
-    msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
-    msh_mat4_t proj = msh_perspective( fovy, (float)w/h, 0.1f, 10.0f );
+    msh_vec3_t cam_pos = msh_vec3(0.8f, 2.6f, 3.0f);
+    msh_mat4_t view = msh_look_at(cam_pos, msh_vec3_zeros(), msh_vec3_posy());
+    msh_vec4_t viewport = msh_vec4(0.0f, 0.0f, (float)w, (float)h);
+    msh_mat4_t proj = msh_perspective(fovy, (float)w/h, 0.1f, 10.0f);
     
-    dd_new_frame_info_t info = { 
+    dd_new_frame_info_t frame_info = { 
       .view_matrix       = view.data,
       .projection_matrix = proj.data,
       .viewport_size     = viewport.data,
@@ -90,28 +94,34 @@ int main(int argc, char** argv)
       [3] = { .position = { 1.0, 0.0, -1.0}, .color = DBGDRAW_GRAY },  
     };
 
-    dd_new_frame( &dd_ctx, &info );
+    dd_new_frame(&dd_ctx, &frame_info);
 
-    dd_set_detail_level( &dd_ctx, 2 );
-    dd_set_shading_type( &dd_ctx, DBGDRAW_SHADING_SOLID );
-    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_FILL );
-    dd_set_instance_data( &dd_ctx, sizeof(instances)/sizeof(instances[0]), instances );
-    dd_set_color( &dd_ctx, DBGDRAW_BLACK );
-    dd_sphere( &dd_ctx, zero_pt.data, 0.05f);
-    dd_end_cmd( &dd_ctx );
-
-
-    dd_set_detail_level( &dd_ctx, 2 );
-    dd_set_primitive_size( &dd_ctx, 6.0f );
-    dd_set_shading_type( &dd_ctx, DBGDRAW_SHADING_SOLID );
-    dd_begin_cmd( &dd_ctx, DBGDRAW_MODE_POINT );
-    dd_set_instance_data( &dd_ctx, sizeof(instances)/sizeof(instances[0]), instances );
-    dd_set_color( &dd_ctx, DBGDRAW_BLACK );
-    dd_circle2d( &dd_ctx, zero_pt.data, 0.1f);
-    dd_end_cmd( &dd_ctx );
+    dd_set_detail_level(&dd_ctx, 2);
+    dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_SOLID);
+    dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_FILL);
+    dd_set_instance_data(&dd_ctx, sizeof(instances)/sizeof(instances[0]), instances);
+    dd_set_color(&dd_ctx, DBGDRAW_BLACK);
+    dd_sphere(&dd_ctx, zero_pt.data, 0.05f);
+    dd_end_cmd(&dd_ctx);
 
 
-    dd_render( &dd_ctx );
+    dd_set_detail_level(&dd_ctx, 2);
+    dd_set_primitive_size(&dd_ctx, 6.0f);
+    dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_SOLID);
+    dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_POINT);
+    dd_set_instance_data(&dd_ctx, sizeof(instances)/sizeof(instances[0]), instances);
+    dd_set_color(&dd_ctx, DBGDRAW_BLACK);
+    dd_circle2d(&dd_ctx, zero_pt.data, 0.1f);
+    dd_end_cmd(&dd_ctx);
+
+    dd_text_info_t text_info = {.vert_align = DBGDRAW_TEXT_TOP, .horz_align=DBGDRAW_TEXT_CENTER};
+    dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_NONE);
+    dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_FILL);
+    dd_set_instance_data(&dd_ctx, sizeof(instances)/sizeof(instances[0]), instances);
+    dd_text_line(&dd_ctx, zero_pt.data, "This is some text", &text_info);
+    dd_end_cmd(&dd_ctx);
+
+    dd_render(&dd_ctx);
 
     d3d11_present(d3d11);
   }

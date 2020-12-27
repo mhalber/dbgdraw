@@ -33,173 +33,173 @@ static const char *PROGRAM_NAME = "dbgdraw_primitives.c";
 
 
 typedef struct {
-    GLFWwindow* window;
-    msh_camera_t* camera;
-    dd_ctx_t* primitives;
-    dd_ctx_t* overlay;
+  GLFWwindow* window;
+  msh_camera_t* camera;
+  dd_ctx_t* primitives;
+  dd_ctx_t* overlay;
 } app_state_t;
 
-int32_t init( app_state_t* state );
+int32_t init(app_state_t* state );
 void frame( app_state_t* state );
 void cleanup( app_state_t* state );
 
 typedef struct input
 {
-    uint8_t keyboard[256];
-    uint8_t mouse_buttons[32];
-    double cur_xpos;
-    double cur_ypos;
-    double prev_xpos;
-    double prev_ypos;
-    float scroll_x;
-    float scroll_y;
+  uint8_t keyboard[256];
+  uint8_t mouse_buttons[32];
+  double cur_xpos;
+  double cur_ypos;
+  double prev_xpos;
+  double prev_ypos;
+  float scroll_x;
+  float scroll_y;
 } input_t;
 
 static input_t input;
 
 void
-mouse_button_callback( GLFWwindow* window, int32_t button, int32_t action, int32_t mods )
+mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods)
 {
-    (void) window;
-    (void) mods;
-    input.mouse_buttons[button] = (action == GLFW_RELEASE ) ? 0 : 1;
+  (void) window;
+  (void) mods;
+  input.mouse_buttons[button] = (action == GLFW_RELEASE ) ? 0 : 1;
 }
 
 void
-scroll_callback( GLFWwindow* window, double xoffset, double yoffset )
+scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    (void) window;
-    input.scroll_x = (float)xoffset;
-    input.scroll_y = (float)yoffset;
+  (void) window;
+  input.scroll_x = (float)xoffset;
+  input.scroll_y = (float)yoffset;
 }
 
 void
 key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods)
 {
-    (void) window;
-    (void) mods;
-    (void) scancode;
-    if( key < 256 ) { input.keyboard[key] = (action == GLFW_RELEASE) ? 0 : 1; }
+  (void) window;
+  (void) mods;
+  (void) scancode;
+  if( key < 256 ) { input.keyboard[key] = (action == GLFW_RELEASE) ? 0 : 1; }
 }
 
 int32_t
 main( void )
 {
-    int32_t        error = 0;
-    app_state_t*   state      = calloc( 1, sizeof(app_state_t) );
-    GLFWwindow*    window     = NULL;
-    dd_ctx_t* primitives = NULL;
-    
-    error = init( state );
-    if( error ) { goto main_return; }
-    
-    window  = state->window;
-    primitives  = state->primitives;
-    
-    while( !glfwWindowShouldClose( window ) )
-    {
-        frame( state );
-    }
-    
-    main_return:
-    dd_term( primitives );
-    glfwTerminate();
-    free( state );
-    return error;
+  int32_t        error = 0;
+  app_state_t*   state      = calloc( 1, sizeof(app_state_t) );
+  GLFWwindow*    window     = NULL;
+  dd_ctx_t* primitives = NULL;
+  
+  error = init(state);
+  if( error ) { goto main_return; }
+  
+  window  = state->window;
+  primitives  = state->primitives;
+  
+  while( !glfwWindowShouldClose( window ) )
+  {
+    frame( state );
+  }
+  
+  main_return:
+  dd_term( primitives );
+  glfwTerminate();
+  free( state );
+  return error;
 }
 
 
 static dd_color_t colors[9];
 
 int32_t
-init( app_state_t* state )
+init(app_state_t* state)
 {
-    int32_t error = 0;
+  int32_t error = 0;
+  
+  error = !(glfwInit());
+  if (error)
+  {
+      fprintf(stderr, "[ERROR] Failed to initialize GLFW library!\n");
+      return 1;
+  }
+  
+  int32_t win_width = 640, win_height = 320;
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_SAMPLES, 4);
+  state->window = glfwCreateWindow(win_width, win_height, PROGRAM_NAME, NULL, NULL);
+  if (!state->window )
+  {
+      fprintf(stderr, "[ERROR] Failed to create window\n" );
+      return 1;
+  }
+  glfwSetMouseButtonCallback(state->window, mouse_button_callback);
+  glfwSetScrollCallback(state->window, scroll_callback);
+  glfwSetKeyCallback(state->window, key_callback);
+  glfwMakeContextCurrent(state->window);
+  
+  if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
+  {
+    fprintf(stderr, "[ERROR] Failed to initialize OpenGL context!\n");
+    return 1;
+  }
+  
+  state->primitives = calloc(1, sizeof(dd_ctx_t));
+  dd_ctx_desc_t desc_primitives =
+  { 
+    .max_vertices = 32,
+    .max_commands = 16,
+    .detail_level = 2,
+    .enable_frustum_cull = true,
+    .enable_depth_test = true
+  };
+  error = dd_init(state->primitives, &desc_primitives);
+  if (error)
+  {
+    fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
+    return 1;
+  }
     
-    error = !(glfwInit());
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
-        return 1;
-    }
+  state->overlay = calloc(1, sizeof(dd_ctx_t));
+  dd_ctx_desc_t desc_overlay = 
+  { 
+    .max_vertices = 32,
+    .max_commands = 16,
+    .detail_level = 2,
+    .enable_frustum_cull = false,
+    .enable_depth_test = false,
+    .enable_default_font = true
+  };
+  error = dd_init(state->overlay, &desc_overlay);
+  if (error)
+  {
+    fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
+    return 1;
+  }
     
-    int32_t win_width = 640, win_height = 320;
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
-    glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-    glfwWindowHint( GLFW_SAMPLES, 4 );
-    state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
-    if( !state->window )
-    {
-        fprintf( stderr, "[ERROR] Failed to create window\n" );
-        return 1;
-    }
-    glfwSetMouseButtonCallback( state->window, mouse_button_callback );
-    glfwSetScrollCallback( state->window, scroll_callback );
-    glfwSetKeyCallback( state->window, key_callback );
-    glfwMakeContextCurrent( state->window );
-    
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
-        return 1;
-    }
-    
-    state->primitives = calloc( 1, sizeof(dd_ctx_t) );
-    dd_ctx_desc_t desc_primitives =
-    { 
-        .max_vertices = 32,
-        .max_commands = 16,
-        .detail_level = 2,
-        .enable_frustum_cull = true,
-        .enable_depth_test = true
-    };
-    error = dd_init( state->primitives, &desc_primitives );
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
-        return 1;
-    }
-    
-    state->overlay = calloc( 1, sizeof(dd_ctx_t) );
-    dd_ctx_desc_t desc_overlay = 
-    { 
-        .max_vertices = 32,
-        .max_commands = 16,
-        .detail_level = 2,
-        .enable_frustum_cull = false,
-        .enable_depth_test = false,
-        .enable_default_font = true
-    };
-    error = dd_init( state->overlay, &desc_overlay );
-    if( error )
-    {
-        fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
-        return 1;
-    }
-    
-    state->camera = calloc( 1, sizeof(msh_camera_t) );
-    msh_camera_init(state->camera, &(msh_camera_desc_t){ 
-                        .eye       = msh_vec3( -3.0f, 3.5f, -8.0f ),
-                        .center    = msh_vec3_zeros(),
-                        .up        = msh_vec3_posy(),
-                        .viewport  = msh_vec4( 0, 0, (float)win_width, (float)win_height ),
-                        .fovy      = (float)msh_rad2deg( 60.0f ),
-                        .znear     = 0.01f,
-                        .zfar      = 100.0f,
-                        .use_ortho = false } );
-    
-    colors[0] = DBGDRAW_BLUE;
-    colors[1] = DBGDRAW_RED;
-    colors[2] = DBGDRAW_GREEN;
-    colors[3] = DBGDRAW_LIGHT_BLUE;
-    colors[4] = DBGDRAW_LIGHT_RED;
-    colors[5] = DBGDRAW_LIGHT_GREEN;
-    colors[6] = DBGDRAW_WHITE;
-    colors[7] = DBGDRAW_WHITE;
-    colors[8] = DBGDRAW_WHITE;
-    
-    return 0;
+  state->camera = calloc(1, sizeof(msh_camera_t));
+  msh_camera_init(state->camera, &(msh_camera_desc_t){ 
+                      .eye       = msh_vec3(-3.0f, 3.5f, -8.0f),
+                      .center    = msh_vec3_zeros(),
+                      .up        = msh_vec3_posy(),
+                      .viewport  = msh_vec4(0, 0, (float)win_width, (float)win_height),
+                      .fovy      = (float)msh_rad2deg(60.0f),
+                      .znear     = 0.01f,
+                      .zfar      = 100.0f,
+                      .use_ortho = false });
+  
+  colors[0] = DBGDRAW_BLUE;
+  colors[1] = DBGDRAW_RED;
+  colors[2] = DBGDRAW_GREEN;
+  colors[3] = DBGDRAW_LIGHT_BLUE;
+  colors[4] = DBGDRAW_LIGHT_RED;
+  colors[5] = DBGDRAW_LIGHT_GREEN;
+  colors[6] = DBGDRAW_WHITE;
+  colors[7] = DBGDRAW_WHITE;
+  colors[8] = DBGDRAW_WHITE;
+  
+  return 0;
 }
 
 
@@ -273,11 +273,12 @@ frame( app_state_t* state )
     
     detail_lvl = msh_clamp( detail_lvl, 0, 4 );
     
-    dd_new_frame_info_t info = { .view_matrix       = cam->view.data,
-        .projection_matrix = cam->proj.data,
-        .viewport_size     = cam->viewport.data,
-        .vertical_fov      = cam->fovy,
-        .projection_type   = DBGDRAW_PERSPECTIVE };
+    dd_new_frame_info_t info = { 
+      .view_matrix       = cam->view.data,
+      .projection_matrix = cam->proj.data,
+      .viewport_size     = cam->viewport.data,
+      .vertical_fov      = cam->fovy,
+      .projection_type   = DBGDRAW_PERSPECTIVE };
     dd_new_frame( primitives, &info );
     
     primitives->enable_depth_test = true;

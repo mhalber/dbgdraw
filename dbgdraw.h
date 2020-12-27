@@ -528,7 +528,8 @@ typedef enum dd_error
   DBGDRAW_ERR_INVALID_FONT_REQUESTED,
   DBGDRAW_ERR_INVALID_MODE,
   DBGDRAW_ERR_USING_TEXT_WITHOUT_FONT,
-
+  DBGDRAW_ERR_INVALID_SHADING, 
+  
   DBGDRAW_ERR_COUNT
 } dd_err_code_t;
 
@@ -3034,6 +3035,7 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
   DBGDRAW_ASSERT(pos);
 
   DBGDRAW_VALIDATE(ctx->cur_cmd->draw_mode == DBGDRAW_MODE_FILL, DBGDRAW_ERR_INVALID_MODE);
+  DBGDRAW_VALIDATE(ctx->cur_cmd->shading_type == DBGDRAW_SHADING_NONE, DBGDRAW_ERR_INVALID_SHADING);
   DBGDRAW_VALIDATE(ctx->cur_cmd != NULL, DBGDRAW_ERR_NO_ACTIVE_CMD);
   ctx->cur_cmd->font_idx = ctx->active_font_idx;
   dd_font_data_t *font = ctx->fonts + ctx->active_font_idx;
@@ -3305,6 +3307,9 @@ const char *dd_error_message(int32_t error_code)
     break;
   case DBGDRAW_ERR_INVALID_MODE:
     return "[DBGDRAW ERROR] Text rendering is only supported when using fill mode (DBGDRAW_MODE_FILL)";
+    break;
+  case DBGDRAW_ERR_INVALID_SHADING:
+    return "[DBGDRAW ERROR] Text rendering is only supported when using default shading mode (DBGDRAW_SHADING_NONE))";
     break;
   default:
     return "[DBGDRAW ERROR] Unknown error";

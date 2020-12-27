@@ -73,11 +73,11 @@ init( app_state_t* state ) {
 	}
 	
 	int32_t win_width = 640, win_height = 320;
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
-    glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_SAMPLES, 4);
+	glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
+	glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
+	glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
+	glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
+	glfwWindowHint( GLFW_SAMPLES, 4 );
 	state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
 	if( !state->window )
 	{
@@ -94,7 +94,7 @@ init( app_state_t* state ) {
 	
 	state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
 	dd_ctx_desc_t desc = { .max_vertices = 1024*50,
-													.max_commands = 32 };
+												 .max_commands = 32 };
 	error = dd_init( state->dd_ctx, &desc );
 	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", "Trueno", 26, 512, 512, &TRUENO_FONT );
 	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
