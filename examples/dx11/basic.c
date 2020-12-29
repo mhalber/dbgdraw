@@ -49,7 +49,7 @@ int main(int argc, char** argv)
     .enable_frustum_cull = false,
     .enable_depth_test = true,
     .enable_default_font = true,
-    .line_antialias_radius = 2.0
+    .line_antialias_radius = 0.0
   };
   
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
@@ -98,11 +98,10 @@ int main(int argc, char** argv)
     dd_new_frame(&dd_ctx, &frame_info);
 
     dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_STROKE);
-    dd_set_color(&dd_ctx, DBGDRAW_ORANGE);
-    dd_set_primitive_size(&dd_ctx, 16.0);
-    
-    dd_circle(&dd_ctx, zero_pt.data, 1.2f);
-
+    dd_set_instance_data(&dd_ctx, sizeof(instances)/sizeof(instances[0]), instances);
+    dd_set_color(&dd_ctx, DBGDRAW_BLACK);
+    dd_set_primitive_size(&dd_ctx, 6.0);
+    dd_circle(&dd_ctx, zero_pt.data, 0.5);
     dd_end_cmd(&dd_ctx);
 
 
@@ -116,12 +115,12 @@ int main(int argc, char** argv)
 
 
     dd_set_detail_level(&dd_ctx, 2);
-    dd_set_primitive_size(&dd_ctx, 6.0f);
-    dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_SOLID);
+    dd_set_primitive_size(&dd_ctx, 16.0f);
+    dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_NONE);
     dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_POINT);
     dd_set_instance_data(&dd_ctx, sizeof(instances)/sizeof(instances[0]), instances);
     dd_set_color(&dd_ctx, DBGDRAW_BLACK);
-    dd_circle2d(&dd_ctx, zero_pt.data, 0.1f);
+    dd_circle2d(&dd_ctx, zero_pt.data, 0.5);
     dd_end_cmd(&dd_ctx);
 
     dd_text_info_t text_info = {.vert_align = DBGDRAW_TEXT_TOP, .horz_align=DBGDRAW_TEXT_CENTER};

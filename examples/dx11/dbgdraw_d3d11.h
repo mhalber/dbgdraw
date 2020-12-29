@@ -414,7 +414,6 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     }
     else
     {
-      int32_t mult = (cmd->draw_mode == DBGDRAW_MODE_STROKE) ? 3 : 6;
       ID3D11ShaderResourceView* buffer_views[] = {backend->vertex_buffer_view, backend->instance_buffer_view};
       ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, null_layout);  
@@ -428,11 +427,11 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
       ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       if (cmd->instance_count ) 
       {
-        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, mult*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
+        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, 3*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
       }
       else
       {
-        ID3D11DeviceContext_Draw(d3d11->device_context, mult*cmd->vertex_count, 0);
+        ID3D11DeviceContext_Draw(d3d11->device_context, 3*cmd->vertex_count, 0);
       }
     }
   }  
@@ -625,7 +624,7 @@ dd__init_point_shader_source( const char** shdr_src )
 
     uint vertex_index_to_byte_offset( uint idx )
     {
-      return (base_index + idx/6)*32;
+      return (base_index + idx/3)*32;
     }
 
     uint instance_index_to_byte_offset( uint idx )
@@ -681,15 +680,11 @@ dd__init_point_shader_source( const char** shdr_src )
         v.color = v.color + i.color;
       }
 
-      float2 offsets[6];
-      offsets[0] = float2(-v.size, -v.size);// Note(maciej): Divide by 2?
-      offsets[1] = float2(-v.size,  v.size);
-      offsets[2] = float2( v.size, -v.size);
-
-      offsets[3] = float2(-v.size,  v.size);
-      offsets[4] = float2( v.size,  v.size);
-      offsets[5] = float2( v.size, -v.size);
-      float2 offset = offsets[vertex_idx%6];
+      float2 offsets[3];
+      offsets[0] = float2(-v.size, -v.size);
+      offsets[1] = float2(-v.size,  3*v.size);
+      offsets[2] = float2( 3*v.size, -v.size);
+      float2 offset = offsets[vertex_idx%3];
 
       float4 clip_pos = mul(mvp, float4(v.pos, 1.0f));
       float2 ndc_pos = clip_pos.xy / clip_pos.w;
@@ -700,7 +695,7 @@ dd__init_point_shader_source( const char** shdr_src )
       vs_out output;
       output.pos = float4( ndc_pos.xy*clip_pos.w, clip_pos.zw );
       output.color = v.color;
-      output.uv = float2(0.0, 0.0);//TODO
+      output.uv = (offset / v.size);
       output.line_info = float2(0.0, 0.0);// Ununsed
       return output;
     }
@@ -753,6 +748,23 @@ dd__init_point_shader_source( const char** shdr_src )
       {
         vertices[4] = init_empty_vertex();
         vertices[5] = init_empty_vertex();
+      }
+
+      if (instancing_enabled == 1)
+      {
+        instance i = load_instance( instance_index_to_byte_offset(instance_idx) );
+        vertices[0].pos += i.pos;
+        vertices[0].color += i.color;
+        vertices[1].pos += i.pos;
+        vertices[1].color += i.color;
+        vertices[2].pos += i.pos;
+        vertices[2].color += i.color;
+        vertices[3].pos += i.pos;
+        vertices[3].color += i.color;
+        vertices[4].pos += i.pos;
+        vertices[4].color += i.color;
+        vertices[5].pos += i.pos;
+        vertices[5].color += i.color;
       }
 
       float4 clip_pos[6];
@@ -885,6 +897,8 @@ dd__init_point_shader_source( const char** shdr_src )
     float4 ps_main( vs_out input ): SV_TARGET {
       if (is_point_rendering > 0)
       {
+        float radius = length(input.uv);
+        if ( radius > 1.0 ) discard;
         return input.color;
       }
       else
