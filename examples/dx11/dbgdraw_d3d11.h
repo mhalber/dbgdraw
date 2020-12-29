@@ -40,9 +40,12 @@ typedef struct dd_base_cb_data
 {
   dd_mat4_t mvp;
   dd_vec4_t viewport;
-  int shading_type;
-  int base_index;
-  int instancing_enabled;
+  dd_vec2_t aa_radius;
+  uint32_t shading_type;
+  uint32_t base_index;
+  uint32_t vertex_count;
+  uint32_t instancing_enabled;
+  uint32_t is_point_rendering;
 } dd_cb_data_t;
 
 ID3DBlob* dd__d3d11_compile_shader( const char* source, const char* target, const char* main );
@@ -364,9 +367,12 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     { 
       .mvp = mvp, 
       .viewport = ctx->viewport,
-      .shading_type = cmd->shading_type, 
-      .base_index = cmd->base_index,
-      .instancing_enabled = (int)(cmd->instance_count && cmd->instance_data)
+      .aa_radius = ctx->aa_radius,
+      .shading_type = (uint32_t)cmd->shading_type, 
+      .base_index = (uint32_t)cmd->base_index,
+      .vertex_count = (uint32_t)cmd->vertex_count,
+      .instancing_enabled = (uint32_t)(cmd->instance_count && cmd->instance_data),
+      .is_point_rendering = (uint32_t)(cmd->draw_mode == DBGDRAW_MODE_POINT)
     };
 
     ID3D11DeviceContext_Map( d3d11->device_context, (ID3D11Resource*)backend->base_constant_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &constant_buffer_data );
@@ -406,30 +412,28 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
       }
 
     }
-    else if (cmd->draw_mode == DBGDRAW_MODE_POINT)
+    else
     {
+      int32_t mult = (cmd->draw_mode == DBGDRAW_MODE_STROKE) ? 3 : 6;
       ID3D11ShaderResourceView* buffer_views[] = {backend->vertex_buffer_view, backend->instance_buffer_view};
       ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, null_layout);  
       ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, 1, &null_buffer, strides, offsets );
 
-      ID3D11DeviceContext_VSSetShaderResources(d3d11->device_context, 0, num_buffers, buffer_views);
       ID3D11DeviceContext_VSSetShader(d3d11->device_context, backend->point_vs, NULL, 0);
+      ID3D11DeviceContext_VSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
+      ID3D11DeviceContext_VSSetShaderResources(d3d11->device_context, 0, num_buffers, buffer_views);
 
-      ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->point_ps, NULL, 0);
+      ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       if (cmd->instance_count ) 
       {
-        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, 6*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
+        ID3D11DeviceContext_DrawInstanced(d3d11->device_context, mult*cmd->vertex_count, max(cmd->instance_count, 1), 0, 0 );
       }
       else
       {
-        ID3D11DeviceContext_Draw(d3d11->device_context, 6*cmd->vertex_count, 0);
+        ID3D11DeviceContext_Draw(d3d11->device_context, mult*cmd->vertex_count, 0);
       }
-    }
-    else
-    {
-      // SKIP
     }
   }  
   return DBGDRAW_ERR_OK;
@@ -507,9 +511,12 @@ dd__init_fill_shader_source( const char** shdr_src )
     {
       float4x4 mvp;
       float4 viewport;
-      int shading_type;
-      int base_index;
-      int instancing_enabled;
+      float2 aa_radius;         // unused
+      uint shading_type;
+      uint base_index;          // unused
+      uint vertex_count;        // unused
+      uint instancing_enabled;
+      uint is_point_rendering;  // unused
     };
     
     struct vs_in {
@@ -574,14 +581,19 @@ dd__init_point_shader_source( const char** shdr_src )
     {
       float4x4 mvp;
       float4 viewport;
-      int shading_type;
-      int base_index;
-      int instancing_enabled;
+      float2 aa_radius;
+      uint shading_type;
+      uint base_index;
+      uint vertex_count;
+      uint instancing_enabled;
+      uint is_point_rendering;
     };
   
     struct vs_out {
       float4 pos: SV_POSITION;
       float4 color: COL;
+      noperspective float2 line_info: TEXCOORD0;
+      noperspective float2 uv: TEXCOORD1;
     };
 
     struct vertex {
@@ -611,6 +623,16 @@ dd__init_point_shader_source( const char** shdr_src )
       return float4(r,g,b,a);
     }
 
+    uint vertex_index_to_byte_offset( uint idx )
+    {
+      return (base_index + idx/6)*32;
+    }
+
+    uint instance_index_to_byte_offset( uint idx )
+    {
+      return idx * 16;
+    }
+
     vertex load_vertex( uint idx )
     {
       float4 data_a = asfloat(vertex_data.Load4( idx ));
@@ -625,6 +647,16 @@ dd__init_point_shader_source( const char** shdr_src )
       return v;
     }
 
+    vertex init_empty_vertex()
+    {
+      vertex v;
+      v.pos = float3(0.0, 0.0, 0.0);
+      v.size = 0.0;
+      v.normal_uv = float3(0.0, 0.0, 0.0);
+      v.color = float4(0.0, 0.0, 0.0, 0.0);
+      return v;
+    }
+
     instance load_instance( uint idx )
     {
       float3 pos_data = asfloat(instance_data.Load3(idx));
@@ -636,15 +668,15 @@ dd__init_point_shader_source( const char** shdr_src )
       return i;
     }
 
-    vs_out vs_main( uint idx : SV_VertexID, uint instance_idx : SV_InstanceID ) {
-
+    vs_out point_main( uint vertex_idx, uint instance_idx )
+    {
       float width  = viewport.z - viewport.x;
       float height = viewport.w - viewport.y;
-      vertex v = load_vertex( (base_index + idx/6)*32 );
+      vertex v = load_vertex( vertex_index_to_byte_offset(vertex_idx) );
     
       if (instancing_enabled == 1)
       {
-        instance i = load_instance( instance_idx * 16 );
+        instance i = load_instance( instance_index_to_byte_offset(instance_idx) );
         v.pos = v.pos + i.pos;
         v.color = v.color + i.color;
       }
@@ -657,22 +689,215 @@ dd__init_point_shader_source( const char** shdr_src )
       offsets[3] = float2(-v.size,  v.size);
       offsets[4] = float2( v.size,  v.size);
       offsets[5] = float2( v.size, -v.size);
-      float2 offset = offsets[idx%6];
+      float2 offset = offsets[vertex_idx%6];
 
-      vs_out output;
       float4 clip_pos = mul(mvp, float4(v.pos, 1.0f));
       float2 ndc_pos = clip_pos.xy / clip_pos.w;
       float2 viewport_pos = float2(ndc_pos.x*width, ndc_pos.y*height);
       viewport_pos += offset;
       ndc_pos = float2(viewport_pos.x / width, viewport_pos.y / height);
+
+      vs_out output;
       output.pos = float4( ndc_pos.xy*clip_pos.w, clip_pos.zw );
       output.color = v.color;
-
+      output.uv = float2(0.0, 0.0);//TODO
+      output.line_info = float2(0.0, 0.0);// Ununsed
       return output;
+    }
+
+    int3 calculate_segment_ids(uint vertex_idx)
+    {
+      uint idx = (vertex_idx / 6) * 2;
+      return uint3(idx-2, idx, idx+2);
+    }
+
+    uint2 calculate_vertex_ids( uint segment_idx, uint base_idx)
+    {
+      return uint2( base_idx + segment_idx, base_idx + segment_idx+1 );
+    }
+
+    vs_out line_main( uint vertex_idx, uint instance_idx )
+    {
+      float width  = viewport.z - viewport.x;
+      float height = viewport.w - viewport.y;
+      float half_w = width / 2.0;
+      float half_h = height / 2.0;
+      float aspect_ratio = height / width;
+
+      int3 segment_ids = calculate_segment_ids(vertex_idx);
+      uint2 line_ids_0 = calculate_vertex_ids(segment_ids[0], base_index);
+      uint2 line_ids_1 = calculate_vertex_ids(segment_ids[1], base_index);
+      uint2 line_ids_2 = calculate_vertex_ids(segment_ids[2], base_index);
+      uint quad_idx = vertex_idx % 6;
+
+      // Load vertex data for this and previous/next segments (for mittering)
+      vertex vertices[6];
+      if (segment_ids[0] >= 0)
+      {
+        vertices[0] = load_vertex( line_ids_0[0]*32 );
+        vertices[1] = load_vertex( line_ids_0[1]*32 );
+      }
+      else
+      {
+        vertices[0] = init_empty_vertex();
+        vertices[1] = init_empty_vertex();
+      }
+      vertices[2] = load_vertex( line_ids_1[0]*32 );
+      vertices[3] = load_vertex( line_ids_1[1]*32 );
+      if (segment_ids[0] < (int)vertex_count )
+      {
+        vertices[4] = load_vertex( line_ids_2[0]*32 );
+        vertices[5] = load_vertex( line_ids_2[1]*32 );
+      }
+      else
+      {
+        vertices[4] = init_empty_vertex();
+        vertices[5] = init_empty_vertex();
+      }
+
+      float4 clip_pos[6];
+      clip_pos[0] = mul(mvp, float4(vertices[0].pos, 1.0));
+      clip_pos[1] = mul(mvp, float4(vertices[1].pos, 1.0));
+      clip_pos[2] = mul(mvp, float4(vertices[2].pos, 1.0));
+      clip_pos[3] = mul(mvp, float4(vertices[3].pos, 1.0));
+      clip_pos[4] = mul(mvp, float4(vertices[4].pos, 1.0));
+      clip_pos[5] = mul(mvp, float4(vertices[5].pos, 1.0));
+
+      float2 ndc_pos[6];
+      ndc_pos[0] = clip_pos[0].xy / clip_pos[0].w;
+      ndc_pos[1] = clip_pos[1].xy / clip_pos[1].w;
+      ndc_pos[2] = clip_pos[2].xy / clip_pos[2].w;
+      ndc_pos[3] = clip_pos[3].xy / clip_pos[3].w;
+      ndc_pos[4] = clip_pos[4].xy / clip_pos[4].w;
+      ndc_pos[5] = clip_pos[5].xy / clip_pos[5].w;
+
+      float2 viewport_pos[6];
+      viewport_pos[0] = float2(ndc_pos[0].x * half_w + half_w, ndc_pos[0].y * half_h + half_h);
+      viewport_pos[1] = float2(ndc_pos[1].x * half_w + half_w, ndc_pos[1].y * half_h + half_h);
+      viewport_pos[2] = float2(ndc_pos[2].x * half_w + half_w, ndc_pos[2].y * half_h + half_h);
+      viewport_pos[3] = float2(ndc_pos[3].x * half_w + half_w, ndc_pos[3].y * half_h + half_h);
+      viewport_pos[4] = float2(ndc_pos[4].x * half_w + half_w, ndc_pos[4].y * half_h + half_h);
+      viewport_pos[5] = float2(ndc_pos[5].x * half_w + half_w, ndc_pos[5].y * half_h + half_h);
+
+      float2 line_vector_0 = viewport_pos[1] - viewport_pos[0];
+      float2 line_vector_1 = viewport_pos[3] - viewport_pos[2];
+      float2 line_vector_2 = viewport_pos[5] - viewport_pos[4];
+
+      float line_vector_0_length = length(line_vector_0);
+      float line_vector_1_length = length(line_vector_1);
+      float line_vector_2_length = length(line_vector_2);
+
+      float2 line_vector_0_unit = line_vector_0 / line_vector_0_length;
+      float2 line_vector_1_unit = line_vector_1 / line_vector_1_length;
+      float2 line_vector_2_unit = line_vector_2 / line_vector_2_length;
+
+      if (line_vector_0_length <= 0.000001)
+      {
+        line_vector_0_unit = float2(0.0, 0.0);
+        line_vector_0_length = 0.0;
+      }
+      if (line_vector_1_length <= 0.000001)
+      {
+        line_vector_1_unit = float2(0.0, 0.0);
+        line_vector_1_length = 0.0;
+      }
+      if (line_vector_2_length <= 0.000001)
+      {
+        line_vector_2_unit = float2(0.0, 0.0);
+        line_vector_2_length = 0.0;
+      }
+
+      // make this static?
+      int2 quad_infos[6];
+      quad_infos[0] = int2(0, -1);
+      quad_infos[1] = int2(0,  1);
+      quad_infos[2] = int2(1,  1);
+      quad_infos[3] = int2(0, -1);
+      quad_infos[4] = int2(1,  1);
+      quad_infos[5] = int2(1, -1);
+      int2 quad_info = quad_infos[quad_idx];
+
+      float2 dir = line_vector_1_unit;
+      float2 normal = float2(-dir.y, dir.x);
+
+      float2 mitter_0 = line_vector_1_unit + line_vector_0_unit;
+      float2 mitter_1 = line_vector_1_unit + line_vector_2_unit;
+      mitter_0 = float2(-mitter_0.y, mitter_0.x) * 0.5;
+      mitter_1 = float2(-mitter_1.y, mitter_1.x) * 0.5;
+
+      float mitter_0_length = dot(mitter_0, normal);
+      float mitter_1_length = dot(mitter_1, normal);
+      float cos_angle_threshold = -0.7;
+
+      if (segment_ids[0] < 0 ||
+          length(viewport_pos[2] - viewport_pos[1]) > 0 ||
+          dot(line_vector_0_unit, line_vector_1_unit) < cos_angle_threshold)
+      {
+        mitter_0 = normal;
+        mitter_0_length = 1;
+      }
+
+      if (segment_ids[2] >= (int)vertex_count ||
+          length(viewport_pos[4] - viewport_pos[3]) > 0 ||
+          dot(line_vector_2_unit, line_vector_1_unit) < cos_angle_threshold)
+      {
+        mitter_1 = normal;
+        mitter_1_length = 1;
+      }
+
+      float extension_length = aa_radius.y;
+      float line_length = line_vector_1_length + 2.0 * extension_length;
+      float line_width_a = max(vertices[2].size, 1.0) + aa_radius.x;
+      float line_width_b = max(vertices[3].size, 1.0) + aa_radius.x;
+
+      float2 normal_a = 0.5 * line_width_a * mitter_0 / mitter_0_length;
+      float2 normal_b = 0.5 * line_width_b * mitter_1 / mitter_1_length;
+      float2 extension = extension_length * dir;
+
+      float2 zw_part = (1 - quad_info.x) * clip_pos[2].zw + quad_info.x * clip_pos[3].zw; // TODO(maciej): lerp
+      float2 dir_y = quad_info.y * ((1 - quad_info.x) * normal_a + quad_info.x * normal_b);
+      float2 dir_x = quad_info.x * line_vector_1 + (2.0 * quad_info.x - 1.0) * extension;
+
+      float2 viewport_pt = viewport_pos[2] + dir_x + dir_y;
+      float2 ndc_pt = float2((viewport_pt.x - half_w) / half_w, (viewport_pt.y - half_h) / half_h);
+
+      vs_out output;
+      output.pos = float4(ndc_pt * zw_part.y, zw_part);
+      output.color = vertices[2 + quad_info.x].color;
+      output.line_info.x = (1 - quad_info.x) * line_width_a + quad_info.x * line_width_b;
+      output.line_info.y = 0.5 * line_length;
+      output.uv = float2( (quad_info.y) * output.line_info.x, (2.0 * quad_info.x - 1.0) * output.line_info.y);
+      return output;
+    }
+
+    vs_out vs_main( uint vertex_idx : SV_VertexID, uint instance_idx : SV_InstanceID ) 
+    {
+      if (is_point_rendering > 0)
+      {
+        return point_main(vertex_idx, instance_idx);
+      }
+      else
+      {
+        return line_main(vertex_idx, instance_idx);
+      }
     } 
 
-    float4 ps_main( vs_out input): SV_TARGET {
-      return input.color;
+    float4 ps_main( vs_out input ): SV_TARGET {
+      if (is_point_rendering > 0)
+      {
+        return input.color;
+      }
+      else
+      {
+        float line_width = input.line_info.x;
+        float line_length = input.line_info.y;
+        float au = 1.0 - smoothstep(1.0 - ((2.0 * aa_radius[0]) / line_width), 1.0, abs(input.uv.x / line_width));
+        float av = 1.0 - smoothstep(1.0 - ((aa_radius[1]) / line_length), 1.0, abs(input.uv.y / line_length));
+        
+        float4 output_color = input.color;
+        output_color.a *= min(au, av);
+        return output_color;
+      }
     };
   );
 }

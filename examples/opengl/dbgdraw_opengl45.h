@@ -613,7 +613,7 @@ void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_
 
         int quad_id = gl_VertexID % 6;
         ivec2 quad[6] = ivec2[6](ivec2(0, -1), ivec2(0, 1), ivec2(1, 1),
-                                  ivec2(0, -1), ivec2(1, 1), ivec2(1, -1));
+                                 ivec2(0, -1), ivec2(1, 1), ivec2(1, -1));
         ivec2 quad_pos = quad[quad_id];
 
         v_line_width = (1.0 - quad_pos.x) * line_width_a + quad_pos.x * line_width_b;

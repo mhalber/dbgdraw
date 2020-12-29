@@ -48,7 +48,8 @@ int main(int argc, char** argv)
     .detail_level = 2,
     .enable_frustum_cull = false,
     .enable_depth_test = true,
-    .enable_default_font = true
+    .enable_default_font = true,
+    .line_antialias_radius = 2.0
   };
   
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
@@ -95,6 +96,15 @@ int main(int argc, char** argv)
     };
 
     dd_new_frame(&dd_ctx, &frame_info);
+
+    dd_begin_cmd(&dd_ctx, DBGDRAW_MODE_STROKE);
+    dd_set_color(&dd_ctx, DBGDRAW_ORANGE);
+    dd_set_primitive_size(&dd_ctx, 16.0);
+    
+    dd_circle(&dd_ctx, zero_pt.data, 1.2f);
+
+    dd_end_cmd(&dd_ctx);
+
 
     dd_set_detail_level(&dd_ctx, 2);
     dd_set_shading_type(&dd_ctx, DBGDRAW_SHADING_SOLID);
