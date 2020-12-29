@@ -92,8 +92,9 @@ d3d11_init(const d3d11_desc_t* desc)
     .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT
   };
 
+  //D3D11_CREATE_DEVICE_DEBUG
   int32_t create_flags = D3D11_CREATE_DEVICE_SINGLETHREADED;
-  D3D_FEATURE_LEVEL feature_levels[] = { D3D_FEATURE_LEVEL_11_0 };
+  D3D_FEATURE_LEVEL feature_levels[] = { D3D_FEATURE_LEVEL_11_1 };
   hr = D3D11CreateDeviceAndSwapChain(NULL,                           /* pAdapter (use default) */
                                      D3D_DRIVER_TYPE_HARDWARE,       /* DriverType */
                                      NULL,                           /* Software */
@@ -147,6 +148,13 @@ d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a)
   ID3D11DeviceContext_ClearRenderTargetView(d3d11->device_context, d3d11->render_target_view, clear_color);
   UINT depth_stencil_flags = D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL;
   ID3D11DeviceContext_ClearDepthStencilView(d3d11->device_context, d3d11->depth_stencil_view, depth_stencil_flags, 1.0f, 0);
+}
+
+void d3d11_viewport(d3d11_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+{
+  D3D11_VIEWPORT vp = {(FLOAT)x, (FLOAT)y, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
+  ID3D11DeviceContext_OMSetRenderTargets(d3d11->device_context, 1, &d3d11->render_target_view, d3d11->depth_stencil_view);
+  ID3D11DeviceContext_RSSetViewports(d3d11->device_context, 1, &vp);
 }
 
 void

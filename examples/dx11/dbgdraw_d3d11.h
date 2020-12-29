@@ -444,7 +444,7 @@ dd__d3d11_compile_shader(const char* src, const char* target, const char* main)
 {
   ID3DBlob* output = NULL;
   ID3DBlob* errors = NULL;
-  UINT flags = D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+  UINT flags = /*D3DCOMPILE_DEBUG |*/ D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR | D3DCOMPILE_OPTIMIZATION_LEVEL3;
   D3DCompile(src, strlen(src), NULL, NULL, NULL, main, target, flags, 0, &output, &errors);
   if( errors )
   {
@@ -498,6 +498,7 @@ dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, 
 }
 
 #define DBGDRAW_D3D11_STRINGIFY(x) #x
+#define DBDDRAW_D3D11_SHADER_HEADER "#pragma enable_d3d11_debug_symbols\n"
 
 void
 dd__init_fill_shader_source( const char** shdr_src )
@@ -571,7 +572,9 @@ dd__init_fill_shader_source( const char** shdr_src )
 void
 dd__init_point_shader_source( const char** shdr_src )
 {
-  *shdr_src = DBGDRAW_D3D11_STRINGIFY(
+  *shdr_src = 
+    // DBDDRAW_D3D11_SHADER_HEADER
+    DBGDRAW_D3D11_STRINGIFY(
     
     ByteAddressBuffer vertex_data : register(t0);
     ByteAddressBuffer instance_data : register(t1);

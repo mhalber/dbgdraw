@@ -39,6 +39,7 @@ void d3d11_terminate(d3d11_t* d3d11);
 
 bool d3d11_process_events();
 void d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a);
+void d3d11_viewport(d3d11_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 void d3d11_present(d3d11_t* d3d11);
 
 
