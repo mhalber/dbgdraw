@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 //TODO(maciej): Handle events WM_MOUSELEAVE, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, WM_CHAR
+//TODO(maciej): Ensure no warnings are produced: https://devblogs.microsoft.com/directx/dxgi-flip-model/
 //TODO(maciej): Handle resizing
 
 typedef struct d3d11_desc
@@ -41,6 +42,5 @@ bool d3d11_process_events();
 void d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a);
 void d3d11_viewport(d3d11_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 void d3d11_present(d3d11_t* d3d11);
-
 
 #endif /*D3D11_WINDOW*/

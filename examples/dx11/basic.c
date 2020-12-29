@@ -11,6 +11,8 @@
 #include <dxgi.h>
 #include "d3d11_window.h"
 
+//TODO(maciej): Try using pragmas instead of the libraries in compile command.
+
 #define MSH_VEC_MATH_INCLUDE_LIBC_HEADERS
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define DBGDRAW_VALIDATION_LAYERS

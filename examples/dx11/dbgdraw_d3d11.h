@@ -3,6 +3,8 @@
 
 #define DBGDRAW_D3D11_MAX_FONTS 16
 
+// TODO(maciej): Compress some of the repeated function calls
+
 typedef struct dd_render_backend
 {
   const d3d11_t* d3d11;

@@ -134,7 +134,7 @@ int32_t
 dd_backend_init(dd_ctx_t *ctx)
 {
   static dd_render_backend_t backend = {0};
-  ctx->backend = &backend;
+  ctx->render_backend = &backend;
 
   const char *base_vert_shdr_src = NULL;
   const char *base_frag_shdr_src = NULL;
@@ -142,7 +142,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   GLuint vertex_shader = dd__gl_compile_shader_src(GL_VERTEX_SHADER, base_vert_shdr_src);
   GLuint fragment_shader = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, base_frag_shdr_src);
-  ctx->backend->base_program = dd__gl_link_program(vertex_shader, 0, fragment_shader);
+  backend.base_program = dd__gl_link_program(vertex_shader, 0, fragment_shader);
 
   const char *line_vert_shdr_src = NULL;
   const char *line_frag_shdr_src = NULL;
@@ -150,7 +150,7 @@ dd_backend_init(dd_ctx_t *ctx)
 
   GLuint vertex_shader2 = dd__gl_compile_shader_src(GL_VERTEX_SHADER, line_vert_shdr_src);
   GLuint fragment_shader2 = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, line_frag_shdr_src);
-  ctx->backend->lines_program = dd__gl_link_program(vertex_shader2, 0, fragment_shader2);
+  backend.lines_program = dd__gl_link_program(vertex_shader2, 0, fragment_shader2);
 
   GLCHECK(glCreateVertexArrays(1, &backend.vao));
 
@@ -207,18 +207,22 @@ dd_backend_init(dd_ctx_t *ctx)
 int32_t
 dd_backend_render(dd_ctx_t *ctx)
 {
+  assert(ctx);
+  assert(ctx->render_backend);
+  dd_render_backend_t* backend = ctx->render_backend;
+
   if (!ctx->commands_len)
   {
     return DBGDRAW_ERR_OK;
   }
 
   // TODO(maciej): Swap to persitent mapped buffer (glBufferStorage + glMapBufferRange) and measure the performance?
-  if (ctx->backend->vbo_size < ctx->verts_cap * sizeof(dd_vertex_t))
+  if (backend->vbo_size < ctx->verts_cap * sizeof(dd_vertex_t))
   {
-    ctx->backend->vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
-    GLCHECK(glNamedBufferData(ctx->backend->vbo, ctx->backend->vbo_size, NULL, GL_DYNAMIC_DRAW));
+    backend->vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
+    GLCHECK(glNamedBufferData(backend->vbo, backend->vbo_size, NULL, GL_DYNAMIC_DRAW));
   }
-  GLCHECK(glNamedBufferSubData(ctx->backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data));
+  GLCHECK(glNamedBufferSubData(backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data));
 
   // Setup required ogl state
   if (ctx->enable_depth_test)
@@ -229,7 +233,7 @@ dd_backend_render(dd_ctx_t *ctx)
   GLCHECK(glEnable(GL_LINE_SMOOTH));
   GLCHECK(glEnable(GL_PROGRAM_POINT_SIZE));
   GLCHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-  GLCHECK(glBindVertexArray(ctx->backend->vao));
+  GLCHECK(glBindVertexArray(backend->vao));
   GLCHECK(glEnable(GL_POLYGON_OFFSET_FILL));
   GLCHECK(glPolygonOffset(1.0, 1.0));
 
@@ -247,18 +251,18 @@ dd_backend_render(dd_ctx_t *ctx)
 
     if (cmd->instance_count && cmd->instance_data)
     {
-      if (ctx->backend->ibo_size < cmd->instance_count * sizeof(dd_instance_data_t))
+      if (backend->ibo_size < cmd->instance_count * sizeof(dd_instance_data_t))
       {
-        ctx->instance_cap = cmd->instace_count;
-        ctx->backend->ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
-        GLCHECK(glNamedBufferData(ctx->backend->ibo, ctx->backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
+        ctx->instance_cap = cmd->instance_count;
+        backend->ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
+        GLCHECK(glNamedBufferData(backend->ibo, backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
       }
-      GLCHECK(glNamedBufferSubData(ctx->backend->ibo, 0, ctx->backend->ibo_size, cmd->instance_data));
+      GLCHECK(glNamedBufferSubData(backend->ibo, 0, backend->ibo_size, cmd->instance_data));
     }
 
     if (cmd->draw_mode == DBGDRAW_MODE_FILL)
     {
-      GLCHECK(glUseProgram(ctx->backend->base_program));
+      GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, cmd->shading_type));
       GLCHECK(glUniform1i(2, (cmd->instance_count>0) ));
@@ -268,7 +272,7 @@ dd_backend_render(dd_ctx_t *ctx)
       {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, ctx->fonts[cmd->font_idx].tex_id);
-        glUniform1i(ctx->backend->font_tex_attrib_loc, 0);
+        glUniform1i(backend->font_tex_attrib_loc, 0);
       }
 #endif
       if (cmd->instance_count <= 0)
@@ -283,7 +287,7 @@ dd_backend_render(dd_ctx_t *ctx)
 
     else if (cmd->draw_mode == DBGDRAW_MODE_POINT)
     {
-      GLCHECK(glUseProgram(ctx->backend->base_program));
+      GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, 0));
       GLCHECK(glUniform1i(2, (int)(cmd->instance_count>0) ));
@@ -301,9 +305,9 @@ dd_backend_render(dd_ctx_t *ctx)
     else
     {
       GLCHECK(glActiveTexture(GL_TEXTURE0));
-      GLCHECK(glBindTexture(GL_TEXTURE_BUFFER, ctx->backend->line_data_texture_id));
+      GLCHECK(glBindTexture(GL_TEXTURE_BUFFER, backend->line_data_texture_id));
 
-      GLCHECK(glUseProgram(ctx->backend->lines_program));
+      GLCHECK(glUseProgram(backend->lines_program));
 
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, mvp.data));
       GLCHECK(glUniform2fv(1, 1, viewport_size.data));
@@ -342,16 +346,20 @@ int32_t
 dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height,
                              uint32_t *tex_id)
 {
-  GLCHECK(glCreateTextures(GL_TEXTURE_2D, 1, &ctx->backend->font_tex_ids[ctx->fonts_len]));
-  GLCHECK(glTextureParameteri(ctx->backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_S, GL_REPEAT));
-  GLCHECK(glTextureParameteri(ctx->backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_T, GL_REPEAT));
-  GLCHECK(glTextureParameteri(ctx->backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-  GLCHECK(glTextureParameteri(ctx->backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+  assert(ctx);
+  assert(ctx->render_backend);
+  dd_render_backend_t* backend = ctx->render_backend;
 
-  GLCHECK(glTextureStorage2D(ctx->backend->font_tex_ids[ctx->fonts_len], 1, GL_R8, width, height));
-  GLCHECK(glTextureSubImage2D(ctx->backend->font_tex_ids[ctx->fonts_len], 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, data));
-  *tex_id = ctx->backend->font_tex_ids[ctx->fonts_len];
-  ctx->backend->font_tex_attrib_loc = glGetUniformLocation(ctx->backend->base_program, "tex");
+  GLCHECK(glCreateTextures(GL_TEXTURE_2D, 1, &backend->font_tex_ids[ctx->fonts_len]));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_S, GL_REPEAT));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_T, GL_REPEAT));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+
+  GLCHECK(glTextureStorage2D(backend->font_tex_ids[ctx->fonts_len], 1, GL_R8, width, height));
+  GLCHECK(glTextureSubImage2D(backend->font_tex_ids[ctx->fonts_len], 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, data));
+  *tex_id = backend->font_tex_ids[ctx->fonts_len];
+  backend->font_tex_attrib_loc = glGetUniformLocation(backend->base_program, "tex");
 
   return DBGDRAW_ERR_OK;
 }
@@ -360,14 +368,18 @@ dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, 
 int32_t
 dd_backend_term(dd_ctx_t *ctx)
 {
-  glDeleteVertexArrays(1, &ctx->backend->vao);
-  glDeleteBuffers(1, &ctx->backend->vbo);
-  glDeleteProgram(ctx->backend->base_program);
-  glDeleteProgram(ctx->backend->lines_program);
+  assert(ctx);
+  assert(ctx->render_backend);
+  dd_render_backend_t* backend = ctx->render_backend;
+
+  glDeleteVertexArrays(1, &backend->vao);
+  glDeleteBuffers(1, &backend->vbo);
+  glDeleteProgram(backend->base_program);
+  glDeleteProgram(backend->lines_program);
 #if DBGDRAW_HAS_TEXT_SUPPORT
   for (int32_t i = 0; i < ctx->fonts_len; ++i)
   {
-    glDeleteTextures(1, &ctx->backend->font_tex_ids[i]);
+    glDeleteTextures(1, &backend->font_tex_ids[i]);
   }
 #endif
   return DBGDRAW_ERR_OK;
