@@ -9,7 +9,7 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
-#include "d3d11_window.h"
+#include "d3d11_app.h"
 
 //TODO(maciej): Try using pragmas instead of the libraries in compile command.
 
@@ -23,9 +23,11 @@
 #include "dbgdraw.h"
 #include "dbgdraw_d3d11.h"
 
+
 typedef struct app_state {
-  d3d11_t* d3d11;
-  dd_ctx_t* dd_ctx;
+  d3d11_ctx_t d3d11;
+  dd_ctx_t dd_ctx;
+  d3d11_app_input_t* input;
 } app_state_t;
 
 int32_t init(app_state_t* state);
@@ -35,31 +37,33 @@ void cleanup(app_state_t* state);
 int main(void)
 {
   int32_t error = 0;
-  app_state_t* state = calloc( 1, sizeof(app_state_t) );
-  error = init(state);
+  app_state_t state = {0};
+  error = init(&state);
   if( error ) { goto main_return; }
-  d3d11_t* d3d11 = state->d3d11;
+  d3d11_ctx_t* d3d11 = &state.d3d11;
 
-  while (d3d11_process_events())
+  while ( d3d11_process_events(&state.input) )
   {
     d3d11_viewport(d3d11, 0, 0, d3d11->render_target_width, d3d11->render_target_height);
     d3d11_clear(d3d11, 0.9f, 0.9f, 0.9f, 1.0f);
 
-    frame(state);
+    frame(&state);
 
     d3d11_present(d3d11);
   }
 
   main_return:
-  cleanup(state);
+  cleanup(&state);
   return error;
 }
 
 
 void frame(app_state_t* state) 
 {
-  dd_ctx_t* dd_ctx = state->dd_ctx;
-  d3d11_t* d3d11 = state->d3d11;
+  assert(state);
+  dd_ctx_t* dd_ctx = &state->dd_ctx;
+  d3d11_ctx_t* d3d11 = &state->d3d11;
+  d3d11_app_input_t* input = state->input;
 
   int32_t w = d3d11->render_target_width;
   int32_t h = d3d11->render_target_height;
@@ -108,9 +112,11 @@ void frame(app_state_t* state)
 
 int32_t init(app_state_t* state)
 {
+  assert(state);
+
   int32_t error = 0;
   
-  d3d11_desc_t d3d11_desc = 
+  d3d11_ctx_desc_t d3d11_desc = 
   {
     .win_title = "dbgdraw_basic",
     .win_x = 100,
@@ -119,10 +125,13 @@ int32_t init(app_state_t* state)
     .win_h = 320,
     .sample_count = 1
   };
-  // NOTE(maciej): This function should return opaque resource, like a decorated void ptr.
-  // TODO(maciej): Check for errors?
-  state->d3d11 = d3d11_init(&d3d11_desc); 
-  
+ 
+  error = d3d11_init(&state->d3d11, &d3d11_desc); 
+  if (error)
+  {
+    fprintf(stderr, "[ERROR] Failed to initialize d3d11!\n");
+    return 1;
+  }
 
  dd_ctx_desc_t desc = 
   { 
@@ -136,11 +145,10 @@ int32_t init(app_state_t* state)
   };
   
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
-  backend->d3d11 = state->d3d11;
-  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
-  state->dd_ctx->render_backend = backend;
-  error = dd_init( state->dd_ctx, &desc);
-  if(error)
+  backend->d3d11 = &state->d3d11;
+  state->dd_ctx.render_backend = backend;
+  error = dd_init( &state->dd_ctx, &desc);
+  if (error)
   {
     fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
     return 1;
@@ -152,9 +160,7 @@ int32_t init(app_state_t* state)
 void cleanup( app_state_t* state )
 {
   assert(state);
-  dd_term(state->dd_ctx);
-  d3d11_terminate(state->d3d11);
-  free(state->dd_ctx->render_backend);
-  free(state->dd_ctx);
-  free(state);
+  dd_term(&state->dd_ctx);
+  d3d11_terminate(&state->d3d11);
+  free(state->dd_ctx.render_backend);
 }

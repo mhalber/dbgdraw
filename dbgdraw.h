@@ -86,7 +86,7 @@
 
   EXAMPLE PROGRAM
   =================
-  TODO
+
 */
 
 #ifndef DBGDRAW_H
@@ -250,7 +250,7 @@ typedef struct dd_text_info dd_text_info_t;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Initialize / Terminate - call on init and shut down
-int32_t dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *descs);
+int32_t dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc);
 int32_t dd_term(dd_ctx_t *ctx);
 
 // Start new frame (update all necessary data as listed in info pointer) / Render - call at the start and end of a frame
@@ -1482,7 +1482,7 @@ void dd__arc_point(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, 
   }
 
 #if 0
-//TODO(maciej): Since transcendentals are so slow, we could go ham and precompute some data
+//TODO(maciej): Since transcendentals are so slow, we could precompute some data
 // using simd instructions
   __m128 wide_x = _mm_set_ps(0.0f, 1.57f, 3.143f, 0.707f);
   __m128 wide_cosx;
@@ -1493,7 +1493,6 @@ void dd__arc_point(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, 
   _mm_store_ps(cos_x, wide_cosx);
 #endif
 
-  // TODO(maciej): Should the be precomputed in context?
   float theta1;
   float ox1 = 0.0f, oy1 = 0.0f;
   int32_t final_res = full_circle ? resolution : resolution + 1;
@@ -2376,7 +2375,7 @@ dd_rounded_rect2d(dd_ctx_t *ctx, float *a, float *b, float rounding)
   return dd_rounded_rect2d_ex(ctx, a, b, all_corners_rounding);
 }
 
-// TODO(maciej): Sizes should be in pixel size..
+// TODO(maciej): Sizes should be in pixels...
 int32_t
 dd_billboard_rect(dd_ctx_t *ctx, float *p, float width, float height)
 {
@@ -2565,7 +2564,7 @@ dd_obb(dd_ctx_t *ctx, float *c, float *m)
 
   dd_vec3_t center_pt = dd_vec3(c[0], c[1], c[2]);
   dd_mat3_t axes;
-  memcpy(axes.data, m, sizeof(axes)); // TODO(maciej): do we need all these memcpys?
+  memcpy(axes.data, m, sizeof(axes));
 
   if (!dd__frustum_obb_test(ctx, center_pt, axes))
   {

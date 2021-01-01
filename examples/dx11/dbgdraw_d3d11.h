@@ -7,7 +7,7 @@
 
 typedef struct dd_render_backend
 {
-  const d3d11_t* d3d11;
+  const d3d11_ctx_t* d3d11;
 
   uint32_t vertex_buffer_size;
   ID3D11Buffer* vertex_buffer;
@@ -67,7 +67,7 @@ dd_backend_init( dd_ctx_t* ctx )
 {
   HRESULT hr;
   dd_render_backend_t *backend = (dd_render_backend_t*)ctx->render_backend;
-  const d3d11_t* d3d11 = backend->d3d11;
+  const d3d11_ctx_t* d3d11 = backend->d3d11;
 
   const char* fill_shd_src = NULL;
   const char* point_shd_src = NULL;
@@ -287,7 +287,7 @@ int32_t dd_backend_term(dd_ctx_t* ctx)
 int32_t dd_backend_render(dd_ctx_t* ctx)
 {
   dd_render_backend_t* backend = ctx->render_backend;
-  const d3d11_t* d3d11 = backend->d3d11;
+  const d3d11_ctx_t* d3d11 = backend->d3d11;
 
   if (!ctx->commands_len)
   {
@@ -467,7 +467,7 @@ dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, 
 
   HRESULT hr;
   dd_render_backend_t* backend = ctx->render_backend;
-  const d3d11_t* d3d11 = backend->d3d11;
+  const d3d11_ctx_t* d3d11 = backend->d3d11;
 
   // Create texture
   D3D11_TEXTURE2D_DESC texture_desc = 

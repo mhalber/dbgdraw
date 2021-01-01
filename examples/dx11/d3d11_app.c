@@ -11,20 +11,23 @@
 #include <d3dcompiler.h>
 #include <dxgi.h>
 
-#include "d3d11_window.h"
+#include "d3d11_app.h"
 
 #include <assert.h>
 #include <stdio.h>
 
 static LRESULT CALLBACK d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
-static void d3d11_create_default_render_target(d3d11_t* d3d11);
-static void d3d11_update_default_render_target(d3d11_t* d3d11);
-static void d3d11_destroy_default_render_target(d3d11_t* d3d11);
+static void d3d11_create_default_render_target(d3d11_ctx_t* d3d11);
+static void d3d11_update_default_render_target(d3d11_ctx_t* d3d11);
+static void d3d11_destroy_default_render_target(d3d11_ctx_t* d3d11);
 
-d3d11_t*
-d3d11_init(const d3d11_desc_t* desc)
+static d3d11_app_input_t d3d11_input = {0};
+
+int32_t
+d3d11_init(d3d11_ctx_t* d3d11, const d3d11_ctx_desc_t* desc)
 {
-  d3d11_t* d3d11 = calloc(1, sizeof(d3d11_t));
+  assert(d3d11);
+  assert(desc);
 
   d3d11->sample_count = desc->sample_count;
 
@@ -107,15 +110,18 @@ d3d11_init(const d3d11_desc_t* desc)
                                      &d3d11->device,                 /* ppDevice */
                                      feature_levels,                 /* pFeatureLevel */
                                      &d3d11->device_context);        /* ppImmediateContext */
-  assert(SUCCEEDED(hr));
+  if (!SUCCEEDED(hr))
+  {
+    return 1;
+  }
 
   d3d11_create_default_render_target(d3d11);
 
-  return d3d11;
+  return 0;
 }
 
 void
-d3d11_terminate(d3d11_t* d3d11)
+d3d11_terminate(d3d11_ctx_t* d3d11)
 {
   d3d11_destroy_default_render_target(d3d11);
   IDXGISwapChain_Release(d3d11->swap_chain);
@@ -123,10 +129,14 @@ d3d11_terminate(d3d11_t* d3d11)
   ID3D11Device_Release(d3d11->device);
   DestroyWindow(d3d11->win_handle);
   UnregisterClassW( L"dbgdraw_win32_win_class", GetModuleHandleW(NULL));
-  free(d3d11);
 }
 
-bool d3d11_process_events() {
+bool 
+d3d11_process_events(d3d11_app_input_t** input) {
+  if (*input == NULL)
+  {
+    *input = &d3d11_input;
+  }
   static BOOL quit_requested = FALSE;
   MSG msg;
   while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -142,7 +152,7 @@ bool d3d11_process_events() {
 }
 
 void
-d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a)
+d3d11_clear(d3d11_ctx_t* d3d11, float r, float g, float b, float a)
 {
   FLOAT clear_color[4] = {r,g,b,a};
   ID3D11DeviceContext_ClearRenderTargetView(d3d11->device_context, d3d11->render_target_view, clear_color);
@@ -150,7 +160,7 @@ d3d11_clear(d3d11_t* d3d11, float r, float g, float b, float a)
   ID3D11DeviceContext_ClearDepthStencilView(d3d11->device_context, d3d11->depth_stencil_view, depth_stencil_flags, 1.0f, 0);
 }
 
-void d3d11_viewport(d3d11_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t h)
+void d3d11_viewport(d3d11_ctx_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t h)
 {
   D3D11_VIEWPORT vp = {(FLOAT)x, (FLOAT)y, (FLOAT)w, (FLOAT)h, 0.0f, 1.0f};
   ID3D11DeviceContext_OMSetRenderTargets(d3d11->device_context, 1, &d3d11->render_target_view, d3d11->depth_stencil_view);
@@ -158,7 +168,7 @@ void d3d11_viewport(d3d11_t* d3d11, uint32_t x, uint32_t y, uint32_t w, uint32_t
 }
 
 void
-d3d11_present(d3d11_t* d3d11)
+d3d11_present(d3d11_ctx_t* d3d11)
 {
   IDXGISwapChain_Present(d3d11->swap_chain, 1, 0);
   RECT win_rect;
@@ -176,21 +186,66 @@ d3d11_present(d3d11_t* d3d11)
   }
 }
 
-static LRESULT CALLBACK d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
+static LRESULT CALLBACK 
+d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
 {
+  int z_delta;
   switch (message)
   {
     case WM_CLOSE:
       PostQuitMessage(0);
       break;
+    case WM_KEYDOWN:
+      if (w_param == VK_ESCAPE) { PostQuitMessage(0); }
+      d3d11_input.keys[w_param] = 1;
+      break;
+    case WM_KEYUP:
+      if (w_param == VK_ESCAPE) { PostQuitMessage(0); }
+      d3d11_input.keys[w_param] = 0;
+      break;
+    case WM_LBUTTONDOWN:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_LEFT] = 1;
+      break;
+    case WM_LBUTTONUP:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_LEFT] = 0;
+      break;
+    case WM_RBUTTONDOWN:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_RIGHT] = 1;
+      break;
+    case WM_RBUTTONUP:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_RIGHT] = 0;
+      break;
+    case WM_MBUTTONDOWN:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_MIDDLE] = 1;
+      break;
+    case WM_MBUTTONUP:
+      d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_MIDDLE] = 0;
+      break;
+    case WM_MOUSEMOVE:
+      d3d11_input.mouse.prev_x = d3d11_input.mouse.cur_x;
+      d3d11_input.mouse.prev_y = d3d11_input.mouse.cur_y;
+      d3d11_input.mouse.cur_x = (float)GET_X_LPARAM(l_param); 
+      d3d11_input.mouse.cur_y = (float)GET_Y_LPARAM(l_param);
+      break;
+    case WM_MOUSEWHEEL:
+      z_delta = GET_WHEEL_DELTA_WPARAM(w_param);
+      d3d11_input.mouse.scroll_y = (float)(z_delta / abs(z_delta));
+      break;
     default:
       break;
   }
+  uint32_t mods = 0;
+  if (GetKeyState(VK_SHIFT) & (1<<31))    { mods |= D3D11_APP_MODIFIER_SHIFT; }
+  if (GetKeyState(VK_CONTROL) & (1<<31))  { mods |= D3D11_APP_MODIFIER_CTRL; }
+  if (GetKeyState(VK_MENU) & (1<<31))     { mods |= D3D11_APP_MODIFIER_ALT; }
+  if (GetKeyState(VK_LWIN) & (1<<31))     { mods |= D3D11_APP_MODIFIER_SUPER; }
+  if (GetKeyState(VK_RWIN) & (1<<31))     { mods |= D3D11_APP_MODIFIER_SUPER; }
+  d3d11_input.mods = mods;
   return DefWindowProcW(window_handle, message, w_param, l_param);
 }
 
 void
-d3d11_create_default_render_target(d3d11_t* d3d11)
+d3d11_create_default_render_target(d3d11_ctx_t* d3d11)
 {
   HRESULT hr;
 
@@ -230,7 +285,7 @@ d3d11_create_default_render_target(d3d11_t* d3d11)
 }
 
 void
-d3d11_destroy_default_render_target(d3d11_t* d3d11)
+d3d11_destroy_default_render_target(d3d11_ctx_t* d3d11)
 {
   assert(d3d11);
   if (d3d11->render_target) { ID3D11Texture2D_Release(d3d11->render_target); d3d11->render_target = NULL; }
@@ -240,7 +295,7 @@ d3d11_destroy_default_render_target(d3d11_t* d3d11)
 }
 
 void
-d3d11_update_default_render_target(d3d11_t* d3d11)
+d3d11_update_default_render_target(d3d11_ctx_t* d3d11)
 {
   assert(d3d11);
   if (d3d11->swap_chain)
