@@ -6,9 +6,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-//TODO(maciej): Rename this to app window. add d3d11 fields and input fields.
-//TODO(maciej): Test Sample count
-//TODO(maciej): Handle events WM_MOUSELEAVE, WM_MOUSEWHEEL, WM_MOUSEHWHEEL, WM_CHAR
+
 //TODO(maciej): Ensure no warnings are produced: https://devblogs.microsoft.com/directx/dxgi-flip-model/
 
 typedef struct d3d11_app_mouse 

@@ -6,12 +6,17 @@
 #define COBJMACROS
 #include <windows.h>
 #include <windowsx.h>
-#include <shellapi.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
 
 #include "d3d11_app.h"
+
+#pragma comment (lib, "user32.lib")
+#pragma comment (lib, "dxgi.lib")
+#pragma comment (lib, "d3d11.lib")
+#pragma comment (lib, "dxguid.lib")
+#pragma comment (lib, "d3dcompiler.lib")
 
 #include <assert.h>
 #include <stdio.h>
@@ -85,18 +90,18 @@ d3d11_init(d3d11_ctx_t* d3d11, const d3d11_ctx_desc_t* desc)
     },
     .OutputWindow = d3d11->win_handle,
     .Windowed = true,
-    .SwapEffect = DXGI_SWAP_EFFECT_DISCARD,
-    .BufferCount = 1,
+    .SwapEffect = DXGI_SWAP_EFFECT_DISCARD, //DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
+    .BufferCount = 2,
     .SampleDesc =
     {
       .Count = (UINT)d3d11->sample_count,
-      .Quality = d3d11->sample_count > 1 ? (UINT)D3D11_STANDARD_MULTISAMPLE_PATTERN : 0,
+      .Quality = (d3d11->sample_count > 1) ? (UINT)D3D11_STANDARD_MULTISAMPLE_PATTERN : 0,
     },
     .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT
   };
 
   //D3D11_CREATE_DEVICE_DEBUG
-  int32_t create_flags = D3D11_CREATE_DEVICE_SINGLETHREADED;
+  int32_t create_flags = D3D11_CREATE_DEVICE_SINGLETHREADED | D3D11_CREATE_DEVICE_DEBUG;
   D3D_FEATURE_LEVEL feature_levels[] = { D3D_FEATURE_LEVEL_11_1 };
   hr = D3D11CreateDeviceAndSwapChain(NULL,                           /* pAdapter (use default) */
                                      D3D_DRIVER_TYPE_HARDWARE,       /* DriverType */
@@ -265,7 +270,7 @@ d3d11_create_default_render_target(d3d11_ctx_t* d3d11)
     .SampleDesc =
     {
       .Count = (UINT)d3d11->sample_count,
-      .Quality = d3d11->sample_count > 1 ? (UINT)D3D11_STANDARD_MULTISAMPLE_PATTERN : 0
+      .Quality = (d3d11->sample_count > 1) ? (UINT)D3D11_STANDARD_MULTISAMPLE_PATTERN : 0
     },
     .Usage = D3D11_USAGE_DEFAULT,
     .BindFlags = D3D11_BIND_DEPTH_STENCIL

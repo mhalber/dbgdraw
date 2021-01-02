@@ -24,8 +24,8 @@ typedef struct dd_render_backend
   ID3D11InputLayout* base_input_layout;
   ID3D11VertexShader* fill_vs;
   ID3D11PixelShader* fill_ps;
-  ID3D11VertexShader* point_vs;
-  ID3D11PixelShader* point_ps;
+  ID3D11VertexShader* point_line_vs;
+  ID3D11PixelShader* point_line_ps;
 
   ID3D11Buffer* base_constant_buffer;
 
@@ -115,24 +115,22 @@ dd_backend_init( dd_ctx_t* ctx )
   ID3D10Blob_Release(fill_vs_binary); fill_vs_binary = 0;
   ID3D10Blob_Release(fill_ps_binary); fill_ps_binary = 0;
 
-
-
   // Compile point vertex shader
-  ID3D10Blob* point_vs_binary = dd__d3d11_compile_shader( point_shd_src, "vs_5_0", "vs_main" );
+  ID3D10Blob* point_line_vs_binary = dd__d3d11_compile_shader( point_shd_src, "vs_5_0", "vs_main" );
   hr = ID3D11Device_CreateVertexShader(d3d11->device, 
-                                       ID3D10Blob_GetBufferPointer(point_vs_binary), 
-                                       ID3D10Blob_GetBufferSize(point_vs_binary), 
+                                       ID3D10Blob_GetBufferPointer(point_line_vs_binary), 
+                                       ID3D10Blob_GetBufferSize(point_line_vs_binary), 
                                        NULL, 
-                                       &backend->point_vs);
+                                       &backend->point_line_vs);
   assert(SUCCEEDED(hr));
 
   // Compile point pixel shader
-  ID3D10Blob* point_ps_binary = dd__d3d11_compile_shader( point_shd_src, "ps_5_0", "ps_main" );
+  ID3D10Blob* point_line_ps_binary = dd__d3d11_compile_shader( point_shd_src, "ps_5_0", "ps_main" );
   hr = ID3D11Device_CreatePixelShader(d3d11->device, 
-                                      ID3D10Blob_GetBufferPointer( point_ps_binary ),
-                                      ID3D10Blob_GetBufferSize( point_ps_binary ),
+                                      ID3D10Blob_GetBufferPointer( point_line_ps_binary ),
+                                      ID3D10Blob_GetBufferSize( point_line_ps_binary ),
                                       NULL,
-                                      &backend->point_ps);
+                                      &backend->point_line_ps);
   assert(SUCCEEDED(hr));
 
 
@@ -217,8 +215,9 @@ dd_backend_init( dd_ctx_t* ctx )
   // Setup rasterizer state
   D3D11_RASTERIZER_DESC rasterizer_state_desc = 
   {
+    .FrontCounterClockwise = FALSE,
     .FillMode = D3D11_FILL_SOLID,
-    .CullMode = D3D11_CULL_NONE
+    .CullMode = D3D11_CULL_BACK
   };
   hr = ID3D11Device_CreateRasterizerState( d3d11->device, &rasterizer_state_desc, &backend->rasterizer_state );
   assert(SUCCEEDED(hr));
@@ -261,20 +260,24 @@ int32_t dd_backend_term(dd_ctx_t* ctx)
   dd_render_backend_t *backend = (dd_render_backend_t*)ctx->render_backend;
 
   ID3D11Buffer_Release( backend->vertex_buffer );
-  ID3D11Buffer_Release( backend->instance_buffer );
   ID3D11ShaderResourceView_Release( backend->vertex_buffer_view );
+
+  ID3D11Buffer_Release( backend->instance_buffer );
   ID3D11ShaderResourceView_Release( backend->instance_buffer_view );
 
   ID3D11RasterizerState_Release( backend->rasterizer_state );
-  ID3D11BlendState_Release( backend->blend_state );
   ID3D11DepthStencilState_Release( backend->depth_stencil_state );
-
+  ID3D11BlendState_Release( backend->blend_state );
+  
   ID3D11InputLayout_Release( backend->base_input_layout );
   ID3D11VertexShader_Release( backend->fill_vs );
+  ID3D11VertexShader_Release( backend->point_line_vs );
   ID3D11PixelShader_Release( backend->fill_ps );
+  ID3D11PixelShader_Release( backend->point_line_ps );
   ID3D11Buffer_Release( backend->base_constant_buffer );
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
+  ID3D11SamplerState_Release( backend->font_texture_sampler );
   for (int32_t i = 0; i < backend->font_texture_count; ++i)
   {
     ID3D11Buffer_Release( backend->font_textures[i] );
@@ -421,11 +424,11 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, null_layout);  
       ID3D11DeviceContext_IASetVertexBuffers(d3d11->device_context, 0, 1, &null_buffer, strides, offsets );
 
-      ID3D11DeviceContext_VSSetShader(d3d11->device_context, backend->point_vs, NULL, 0);
+      ID3D11DeviceContext_VSSetShader(d3d11->device_context, backend->point_line_vs, NULL, 0);
       ID3D11DeviceContext_VSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       ID3D11DeviceContext_VSSetShaderResources(d3d11->device_context, 0, num_buffers, buffer_views);
 
-      ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->point_ps, NULL, 0);
+      ID3D11DeviceContext_PSSetShader(d3d11->device_context, backend->point_line_ps, NULL, 0);
       ID3D11DeviceContext_PSSetConstantBuffers(d3d11->device_context, 0, 1, &backend->base_constant_buffer);
       if (cmd->instance_count ) 
       {
@@ -558,14 +561,16 @@ dd__init_fill_shader_source( const char** shdr_src )
         if (shading_type == 0)
         {
           float texture_val = font_texture.Sample(font_texture_sampler, input.uv_or_normal.xy).r;
-          float alpha = min(input.color.a, texture_val);
+          float alpha = saturate(input.color.a+texture_val);
           return float4(input.color.rgb, alpha);
+          // return float4(1.0, 0.0, 0.0, 1.0);
         }
         else
         {
           float3 light_dir = float3(0, 0, 1);
           float ndotl = dot( input.uv_or_normal, light_dir);
           return float4(input.color.rgb * ndotl, input.color.a);
+          // return float4(0.0, 1.0, 0.0, 1.0);
         }
     };
   );
@@ -871,8 +876,8 @@ dd__init_point_shader_source( const char** shdr_src )
       float2 normal_b = 0.5 * line_width_b * mitter_1 / mitter_1_length;
       float2 extension = extension_length * dir;
 
-      float2 zw_part = (1 - quad_info.x) * clip_pos[2].zw + quad_info.x * clip_pos[3].zw; // TODO(maciej): lerp
-      float2 dir_y = quad_info.y * ((1 - quad_info.x) * normal_a + quad_info.x * normal_b);
+      float2 zw_part = lerp(clip_pos[2].zw, clip_pos[3].zw, quad_info.x); 
+      float2 dir_y = quad_info.y * lerp(normal_a, normal_b, quad_info.x); 
       float2 dir_x = quad_info.x * line_vector_1 + (2.0 * quad_info.x - 1.0) * extension;
 
       float2 viewport_pt = viewport_pos[2] + dir_x + dir_y;
@@ -881,9 +886,9 @@ dd__init_point_shader_source( const char** shdr_src )
       vs_out output;
       output.pos = float4(ndc_pt * zw_part.y, zw_part);
       output.color = vertices[2 + quad_info.x].color;
-      output.line_info.x = (1 - quad_info.x) * line_width_a + quad_info.x * line_width_b;
+      output.line_info.x = lerp(line_width_a, line_width_b, quad_info.x);
       output.line_info.y = 0.5 * line_length;
-      output.uv = float2( (quad_info.y) * output.line_info.x, (2.0 * quad_info.x - 1.0) * output.line_info.y);
+      output.uv = float2( quad_info.y * output.line_info.x, (2.0 * quad_info.x - 1.0) * output.line_info.y);
       return output;
     }
 
@@ -910,9 +915,16 @@ dd__init_point_shader_source( const char** shdr_src )
       {
         float line_width = input.line_info.x;
         float line_length = input.line_info.y;
-        float au = 1.0 - smoothstep(1.0 - ((2.0 * aa_radius[0]) / line_width), 1.0, abs(input.uv.x / line_width));
-        float av = 1.0 - smoothstep(1.0 - ((aa_radius[1]) / line_length), 1.0, abs(input.uv.y / line_length));
-        
+        float au = 1.0;
+        float av = 1.0;
+        if ( aa_radius.x > 0.0001 )
+        {        
+          au = 1.0 - smoothstep(1.0 - ((2.0 * aa_radius.x) / line_width), 1.0, abs(input.uv.x / line_width));
+        }
+        if ( aa_radius.y > 0.0001 )
+        {    
+          av = 1.0 - smoothstep(1.0 - (aa_radius.y / line_length), 1.0, abs(input.uv.y / line_length));
+        }
         float4 output_color = input.color;
         output_color.a *= min(au, av);
         return output_color;

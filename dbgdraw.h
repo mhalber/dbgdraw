@@ -971,11 +971,9 @@ dd_begin_cmd(dd_ctx_t *ctx, dd_mode_t draw_mode)
   DBGDRAW_HANDLE_OUT_OF_MEMORY(ctx->commands, ctx->commands_len + 1, ctx->commands_cap, sizeof(dd_cmd_t));
 
   ctx->cur_cmd = &ctx->commands[ctx->commands_len];
-
+  memset(ctx->cur_cmd, 0, sizeof(dd_cmd_t));
   ctx->cur_cmd->xform = ctx->xform;
-  ctx->cur_cmd->min_depth = 0.0f;
   ctx->cur_cmd->base_index = ctx->verts_len;
-  ctx->cur_cmd->vertex_count = 0;
   ctx->cur_cmd->draw_mode = draw_mode;
   ctx->cur_cmd->shading_type = ctx->shading_type;
 
@@ -3221,8 +3219,9 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     uv_c = dd_vec2(q.s1, q.t0);
 
     dd__vertex_text(ctx, &pt_a, &uv_a);
-    dd__vertex_text(ctx, &pt_b, &uv_b);
     dd__vertex_text(ctx, &pt_c, &uv_c);
+    dd__vertex_text(ctx, &pt_b, &uv_b);
+
 
     pt_a = dd_vec3(min_pt.x, max_pt.y, 0.0);
     uv_a = dd_vec2(q.s0, q.t0);
@@ -3232,8 +3231,8 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     uv_c = dd_vec2(q.s1, q.t1);
 
     dd__vertex_text(ctx, &pt_a, &uv_a);
-    dd__vertex_text(ctx, &pt_b, &uv_b);
     dd__vertex_text(ctx, &pt_c, &uv_c);
+    dd__vertex_text(ctx, &pt_b, &uv_b);
   }
   dd_vertex_t *end = ctx->verts_data + ctx->verts_len;
 

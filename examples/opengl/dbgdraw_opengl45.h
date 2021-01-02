@@ -669,8 +669,8 @@ void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_
 
       out vec4 frag_color;
       void main() {
-        float au = 1.0 - smoothstep(1.0 - ((2.0 * u_aa_radius[0]) / v_line_width), 1.0, abs(v_u / v_line_width));
-        float av = 1.0 - smoothstep(1.0 - ((u_aa_radius[1]) / v_line_length), 1.0, abs(v_v / v_line_length));
+        float au = 1.0 - smoothstep(1.0 - ((2.0 * u_aa_radius.x) / v_line_width), 1.0, abs(v_u / v_line_width));
+        float av = 1.0 - smoothstep(1.0 - (u_aa_radius.y / v_line_length), 1.0, abs(v_v / v_line_length));
         frag_color = v_col;
         frag_color.a *= min(au, av);
       });

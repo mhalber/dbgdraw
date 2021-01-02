@@ -1296,67 +1296,68 @@ msh_pdf2cdf( const double* pdf, double* cdf, int32_t n_vals )
 MSHDEF void
 msh_discrete_distribution_update( msh_discrete_distrib_t* ctx, double* weights, size_t n_weights )
 {
-    assert( ctx->n_weights == n_weights );
+  assert( ctx->n_weights == n_weights );
+  
+  char* data = (char*)malloc( ctx->n_weights * (sizeof(double) + sizeof(int32_t)) );
+  double *pdf   = (double*)data;
+  msh_distrib2pdf( weights, pdf, ctx->n_weights );
+  
+  double avg_prob = 1.0 / (double)ctx->n_weights;
+  uint32_t n_large_vals = 0;
+  uint32_t n_small_vals = 0;
+  for( size_t i = 0; i < ctx->n_weights; ++i )
+  {
+    if( pdf[i] >= avg_prob ) { n_large_vals++; }
+    else                     { n_small_vals++; }
+  }
+  
+  int32_t *small_vals = (int32_t*)(data + (ctx->n_weights * sizeof(double) + n_large_vals * sizeof(uint32_t)));
+  int32_t *large_vals = (int32_t*)(data + (ctx->n_weights * sizeof(double)));
+
+
+  n_large_vals = 0;
+  n_small_vals = 0;
+  for( int32_t i = 0; i < ctx->n_weights; ++i )
+  {
+    if( pdf[i] >= avg_prob ) { large_vals[n_large_vals++] = i; }
+    else                     { small_vals[n_small_vals++] = i; }
+  }
+  
+  while( n_small_vals > 0 && n_large_vals > 0 )
+  {
+    int32_t l = small_vals[--n_small_vals];
+    int32_t g = large_vals[--n_large_vals];
     
-    char* data = (char*)malloc( ctx->n_weights * (sizeof(double) + sizeof(int32_t)) );
-    double *pdf   = (double*)data;
-    msh_distrib2pdf( weights, pdf, ctx->n_weights );
+    ctx->prob[l] = pdf[l] * ctx->n_weights;
+    ctx->alias[l] = g;
     
-    double avg_prob = 1.0 / (double)ctx->n_weights;
-    uint32_t n_large = 0;
-    uint32_t n_small = 0;
-    for( size_t i = 0; i < ctx->n_weights; ++i )
-    {
-        if( pdf[i] >= avg_prob ) { n_large++; }
-        else                     { n_small++; }
-    }
-    
-    int32_t *large = (int32_t*)(data + (ctx->n_weights * sizeof(double)));
-    int32_t *small = (int32_t*)(data + (ctx->n_weights * sizeof(double) + n_large * sizeof(uint32_t)));
-    
-    n_large = 0;
-    n_small = 0;
-    for( int32_t i = 0; i < ctx->n_weights; ++i )
-    {
-        if( pdf[i] >= avg_prob ) { large[n_large++] = i; }
-        else                     { small[n_small++] = i; }
-    }
-    
-    while( n_small > 0 && n_large > 0 )
-    {
-        int32_t l = small[--n_small];
-        int32_t g = large[--n_large];
-        
-        ctx->prob[l] = pdf[l] * ctx->n_weights;
-        ctx->alias[l] = g;
-        
-        pdf[g] = (pdf[g] + pdf[l]) - avg_prob;
-        if( pdf[g] >= avg_prob ) { large[n_large++] = g; }
-        else                     { small[n_small++] = g; }
-    }
-    
-    while( n_small > 0 )
-    {
-        int i = small[--n_small];
-        ctx->prob[i] = 1.0;
-    }
-    while( n_large > 0 )
-    {
-        int i = large[--n_large];
-        ctx->prob[i] = 1.0;
-    }
-    
-    free( data );
+    pdf[g] = (pdf[g] + pdf[l]) - avg_prob;
+    if( pdf[g] >= avg_prob ) { large_vals[n_large_vals++] = g; }
+    else                     { small_vals[n_small_vals++] = g; }
+  }
+  
+  while( n_small_vals > 0 )
+  {
+    int i = small_vals[--n_small_vals];
+    ctx->prob[i] = 1.0;
+  }
+  while( n_large_vals > 0 )
+  {
+    int i = large_vals[--n_large_vals];
+    ctx->prob[i] = 1.0;
+  }
+  
+  free( data );
 }
 
 MSHDEF void
 msh_discrete_distribution_init( msh_discrete_distrib_t* ctx, double* weights, int32_t n_weights, uint32_t seed )
 {
-    msh_rand_init( &ctx->rand_gen, seed );
-    ctx->n_weights = n_weights;
-    ctx->prob  = (double*)malloc( ctx->n_weights * sizeof(double) );
-    ctx->alias = (int*)malloc( ctx->n_weights * sizeof(int) );
-    msh_discrete_distribution_update( ctx, weights, n_weights );
+  msh_rand_init( &ctx->rand_gen, seed );
+  ctx->n_weights = n_weights;
+  ctx->prob  = (double*)malloc( ctx->n_weights * sizeof(double) );
+  ctx->alias = (int*)malloc( ctx->n_weights * sizeof(int) );
+  msh_discrete_distribution_update( ctx, weights, n_weights );
 }
 
 MSHDEF void

@@ -1,108 +1,107 @@
+#define WIN32_LEAN_AND_MEAN
+#define D3D11_NO_HELPERS
+#define CINTERFACE
+#define COBJMACROS
+#include <windows.h>
+#include <windowsx.h>
+#include <shellapi.h>
+#include <d3d11.h>
+#include <d3dcompiler.h>
+#include <dxgi.h>
+
+#include "d3d11_app.h"
+
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
 #define MSH_VEC_MATH_IMPLEMENTATION
-#define GLFW_INCLUDE_NONE
 #define DBGDRAW_VALIDATION_LAYERS
+#define DBGDRAW_USE_DEFAULT_FONT
 
 #include "msh_std.h"
 #include "msh_vec_math.h"
 #include "stb_truetype.h"
 #include "dbgdraw.h"
+#include "dbgdraw_d3d11.h"
 
-#include "GLFW/glfw3.h"
-#if defined(DD_USE_OGL_33)
-#include "glad33.h"
-#include "dbgdraw_opengl33.h"
-#define DD_GL_VERSION_MAJOR 3
-#define DD_GL_VERSION_MINOR 3
-#elif defined(DD_USE_OGL_45)
-#include "glad45.h"
-#include "dbgdraw_opengl45.h"
-#define DD_GL_VERSION_MAJOR 4
-#define DD_GL_VERSION_MINOR 5
-#else
-#error "Unrecognized OpenGL Version! Please define either DD_USE_OGL_33 or DD_USE_OGL_45!"
-#endif
 
-typedef struct {
-    GLFWwindow* window;
-    dd_ctx_t* dd_ctx;
+typedef struct app_state {
+  d3d11_ctx_t d3d11;
+  dd_ctx_t dd_ctx;
+  d3d11_app_input_t* input;
 } app_state_t;
 
-int32_t init( app_state_t* state );
-void frame( app_state_t* state );
-void cleanup( app_state_t* state );
+int32_t init(app_state_t* state);
+void frame(app_state_t* state);
+void cleanup(app_state_t* state);
 
 static int32_t CMU_FONT,CMU_FONT_SMALL;
 
-int32_t
-main( void )
+int main(void)
 {
   int32_t error = 0;
-  app_state_t* state = calloc( 1, sizeof(app_state_t) );
-  
-  error = init( state );
-  if (error) { goto main_return; }
-  
-  GLFWwindow* window    = state->window;
-  
-  while (!glfwWindowShouldClose( window ))
+  app_state_t state = {0};
+  error = init(&state);
+  if( error ) { goto main_return; }
+  d3d11_ctx_t* d3d11 = &state.d3d11;
+
+  while ( d3d11_process_events(&state.input) )
   {
-    frame( state );
-    
-    glfwSwapBuffers( window );
-    glfwPollEvents();
+    d3d11_viewport(d3d11, 0, 0, d3d11->render_target_width, d3d11->render_target_height);
+    d3d11_clear(d3d11, 0.9f, 0.9f, 0.9f, 1.0f);
+
+    frame(&state);
+
+    d3d11_present(d3d11);
   }
-  
+
   main_return:
-  cleanup( state );
+  cleanup(&state);
   return error;
 }
 
-int32_t 
-init( app_state_t* state ) {
+int32_t init(app_state_t* state)
+{
+  assert(state);
+
   int32_t error = 0;
   
-  error = !(glfwInit());
+  d3d11_ctx_desc_t d3d11_desc = 
+  {
+    .win_title = "dbgdraw_d3d11_bezier",
+    .win_x = 100,
+    .win_y = 100,
+    .win_w = 640,
+    .win_h = 320,
+    .sample_count = 4
+  };
+ 
+  error = d3d11_init(&state->d3d11, &d3d11_desc); 
   if (error)
   {
-    fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
+    fprintf(stderr, "[ERROR] Failed to initialize d3d11!\n");
     return 1;
   }
-  
-  int32_t win_width = 640, win_height = 320;
-  glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
-  glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
-  glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
-  glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-  glfwWindowHint( GLFW_SAMPLES, 4 );
-  state->window = glfwCreateWindow( win_width, win_height, "dbgdraw_ogl_bezier", NULL, NULL );
-  if (!state->window)
-  {
-    fprintf( stderr, "[ERROR] Failed to create window\n" );
-    return 1;
-  }
-  
-  glfwMakeContextCurrent( state->window );
-  if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
-  {
-    fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
-    return 1;
-  }
-  
-  state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
+
   dd_ctx_desc_t desc = 
   { 
     .max_vertices = 1024*200,
     .max_commands = 8,
+    .enable_frustum_cull = false,
+    .enable_depth_test = false,
+    .enable_default_font = true,
     .line_antialias_radius = 2.0f
   };
-  error = dd_init( state->dd_ctx, &desc );
-  error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
-  error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 20, 512, 512, &CMU_FONT_SMALL );
-  if( error )
+  
+  dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
+  backend->d3d11 = &state->d3d11;
+  state->dd_ctx.render_backend = backend;
+  error = dd_init( &state->dd_ctx, &desc );
+  error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
+  error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 20, 512, 512, &CMU_FONT_SMALL );
+  printf("%d %d\n", CMU_FONT, CMU_FONT_SMALL);
+  if (error)
   {
-    fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
+    fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
     return 1;
   }
   
@@ -112,42 +111,42 @@ init( app_state_t* state ) {
 void
 draw_line_segments( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, dd_color_t color, float width )
 {
-  dd_set_color( dd_ctx, color );
-  dd_set_primitive_size( dd_ctx, width );
-  
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-  for( int32_t i = 0; i < n_pts-1; ++i )
-  {
-    dd_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
-  }
-  dd_end_cmd( dd_ctx );
+    dd_set_color( dd_ctx, color );
+    dd_set_primitive_size( dd_ctx, width );
+    
+    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+    for( int32_t i = 0; i < n_pts-1; ++i )
+    {
+        dd_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
+    }
+    dd_end_cmd( dd_ctx );
 }
 
 void
 draw_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, 
             dd_color_t pt_fill_color, dd_color_t pt_stroke_color, float radius )
 {
-  dd_ctx->detail_level = 3;
-  
-  dd_set_color( dd_ctx, pt_fill_color );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-  for( int32_t i = 0; i < n_pts ; ++i )
-  {
-    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
-  }
-  dd_end_cmd( dd_ctx );
-  
-  
-  dd_set_color( dd_ctx, pt_stroke_color );
-  dd_set_primitive_size( dd_ctx, 2.0f );
-  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-  for( int32_t i = 0; i < n_pts ; ++i )
-  {
-    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
-  }
-  dd_end_cmd( dd_ctx );
-  
-  dd_ctx->detail_level = 2;
+    dd_ctx->detail_level = 3;
+    
+    dd_set_color( dd_ctx, pt_fill_color );
+    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+    for( int32_t i = 0; i < n_pts ; ++i )
+    {
+        dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+    }
+    dd_end_cmd( dd_ctx );
+    
+    
+    dd_set_color( dd_ctx, pt_stroke_color );
+    dd_set_primitive_size( dd_ctx, 2.0f );
+    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+    for( int32_t i = 0; i < n_pts ; ++i )
+    {
+        dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+    }
+    dd_end_cmd( dd_ctx );
+    
+    dd_ctx->detail_level = 2;
 }
 
 // Based on  https://blog.demofox.org/2015/07/05/the-de-casteljeau-algorithm-for-evaluating-bezier-curves/
@@ -205,6 +204,7 @@ dd_vec2_t quartic_interpolation_pts( dd_vec2_t pt_a, dd_vec2_t pt_b, dd_vec2_t p
   dd_vec2_t pt_2 = cubic_interpolation_pts( pt_b, pt_c, pt_d, pt_e, t );
   return linear_interpolation_pts( pt_1, pt_2, t );
 }
+
 void
 draw_labels(dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t n_pts, dd_color_t text_color, float radius)
 { 
@@ -235,7 +235,6 @@ draw_labels(dd_ctx_t* dd_ctx, dd_vec2_t* pts, char** pts_labels, int32_t n_pts, 
   dd_end_cmd( dd_ctx );
 }
 
-
 float sigmoid( float x, float a, float b, float k )
 {
   return k / (1.0f + expf(a+b*x) ); 
@@ -249,14 +248,12 @@ float smoothstep(float edge0, float edge1, float x) {
 
 void frame(app_state_t* state) 
 {
-  GLFWwindow* window = state->window;
-  dd_ctx_t* dd_ctx = state->dd_ctx;
-  
-  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-  glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-  
-  int32_t w, h;
-  glfwGetWindowSize( window, &w, &h );
+  assert(state);
+  dd_ctx_t* dd_ctx = &state->dd_ctx;
+  d3d11_ctx_t* d3d11 = &state->d3d11;
+
+  int32_t w = d3d11->render_target_width;
+  int32_t h = d3d11->render_target_height;
   
   msh_vec3_t cam_pos = msh_vec3(0, 0, 5);
   msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
@@ -265,11 +262,11 @@ void frame(app_state_t* state)
   
   dd_new_frame_info_t info =
   { 
-    .view_matrix       = view.data,
-    .projection_matrix = proj.data,
-    .viewport_size     = viewport.data,
-    .vertical_fov      = (float)h,
-    .projection_type   = DBGDRAW_ORTHOGRAPHIC
+      .view_matrix       = view.data,
+      .projection_matrix = proj.data,
+      .viewport_size     = viewport.data,
+      .vertical_fov      = (float)h,
+      .projection_type   = DBGDRAW_ORTHOGRAPHIC
   };
   dd_new_frame( dd_ctx, &info );
   
@@ -345,7 +342,7 @@ void frame(app_state_t* state)
   draw_points( dd_ctx, average_pts_c, NPTS-3, DBGDRAW_LIGHT_BLUE,   DBGDRAW_BLUE,   r*3.0f );
   draw_points( dd_ctx, average_pts_d, NPTS-4, DBGDRAW_LIGHT_PURPLE, DBGDRAW_PURPLE, r*3.0f );
   
-  draw_labels( dd_ctx, control_pts, control_pts_labels, NPTS,  DBGDRAW_BLACK, 5.0f );
+  draw_labels( dd_ctx, control_pts, control_pts_labels, NPTS, DBGDRAW_BLACK, 5.0f );
   
   dd_render( dd_ctx );
 }
@@ -353,7 +350,8 @@ void frame(app_state_t* state)
 
 void cleanup( app_state_t* state )
 {
-  dd_term( state->dd_ctx );
-  glfwTerminate();
-  free( state );
+  assert(state);
+  dd_term(&state->dd_ctx);
+  d3d11_terminate(&state->d3d11);
+  free(state->dd_ctx.render_backend);
 }

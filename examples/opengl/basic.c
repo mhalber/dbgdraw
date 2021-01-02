@@ -73,7 +73,7 @@ int32_t init( app_state_t* state ) {
   glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, 4);
-  state->window = glfwCreateWindow( win_width, win_height, "dbgdraw_basic", NULL, NULL );
+  state->window = glfwCreateWindow( win_width, win_height, "dbgdraw_ogl_basic", NULL, NULL );
   if( !state->window )
   {
     fprintf( stderr, "[ERROR] Failed to create window\n" );
