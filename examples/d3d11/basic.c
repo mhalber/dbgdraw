@@ -55,7 +55,6 @@ int main(void)
   return error;
 }
 
-
 int32_t init(app_state_t* state)
 {
   assert(state);
@@ -86,7 +85,7 @@ int32_t init(app_state_t* state)
     .detail_level = 2,
     .enable_frustum_cull = false,
     .enable_depth_test = true,
-    .enable_default_font = true,
+    .enable_default_font = false,
     .line_antialias_radius = 2.0f
   };
   

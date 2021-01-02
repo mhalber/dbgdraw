@@ -98,7 +98,7 @@ int32_t init(app_state_t* state)
   error = dd_init( &state->dd_ctx, &desc );
   error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
   error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 20, 512, 512, &CMU_FONT_SMALL );
-  printf("%d %d\n", CMU_FONT, CMU_FONT_SMALL);
+
   if (error)
   {
     fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
