@@ -754,7 +754,7 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
   ctx->detail_level = DD_MAX(desc->detail_level, 0);
   ctx->xform = dd_mat4_identity();
   ctx->frustum_cull = desc->enable_frustum_cull;
-  ctx->primitive_size = 1.5f;
+  ctx->primitive_size = 2.0f;
   ctx->view = dd_mat4_identity();
   ctx->proj = dd_mat4_identity();
   ctx->aa_radius = dd_vec2(desc->line_antialias_radius, 0.0f);
@@ -1606,22 +1606,22 @@ void dd__arc_fill(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, i
     {
       if (ctx->cur_cmd->shading_type)
       {
-        dd__triangle_normal(ctx, center, &pt_b, &pt_a, &normal);
+        dd__triangle_normal(ctx, center, &pt_a, &pt_b, &normal);
       }
       else
       {
-        dd__triangle(ctx, center, &pt_b, &pt_a);
+        dd__triangle(ctx, center, &pt_a, &pt_b);
       }
     }
     else
     {
       if (ctx->cur_cmd->shading_type)
       {
-        dd__triangle_normal(ctx, center, &pt_a, &pt_b, &normal);
+        dd__triangle_normal(ctx, center, &pt_b, &pt_a, &normal);
       }
       else
       {
-        dd__triangle(ctx, center, &pt_a, &pt_b);
+        dd__triangle(ctx, center, &pt_b, &pt_a);
       }
     }
   }
@@ -2320,8 +2320,8 @@ dd_rounded_rect2d_ex(dd_ctx_t *ctx, float *a, float *b, float *radii)
       pt0 = pt1;
     }
 
-    dd__triangle(ctx, &corners[0], &corners[1], &corners[2]);
-    dd__triangle(ctx, &corners[2], &corners[3], &corners[0]);
+    dd__triangle(ctx, &corners[0], &corners[2], &corners[1]);
+    dd__triangle(ctx, &corners[2], &corners[0], &corners[3]);
   }
   else if (ctx->cur_cmd->draw_mode == DBGDRAW_MODE_STROKE)
   {
@@ -2428,7 +2428,7 @@ dd__circle_ex(dd_ctx_t *ctx, float *center, float radius, uint8_t is_3d)
 int32_t
 dd_circle(dd_ctx_t *ctx, float *center, float radius)
 {
-  return dd__circle_ex(ctx, center, radius, 1);
+  return dd__circle_ex(ctx, center, radius, 0);
 }
 
 int32_t
@@ -3219,9 +3219,8 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     uv_c = dd_vec2(q.s1, q.t0);
 
     dd__vertex_text(ctx, &pt_a, &uv_a);
-    dd__vertex_text(ctx, &pt_c, &uv_c);
     dd__vertex_text(ctx, &pt_b, &uv_b);
-
+    dd__vertex_text(ctx, &pt_c, &uv_c);
 
     pt_a = dd_vec3(min_pt.x, max_pt.y, 0.0);
     uv_a = dd_vec2(q.s0, q.t0);
@@ -3231,8 +3230,8 @@ dd_text_line(dd_ctx_t *ctx, float *pos, const char *str, dd_text_info_t *info)
     uv_c = dd_vec2(q.s1, q.t1);
 
     dd__vertex_text(ctx, &pt_a, &uv_a);
-    dd__vertex_text(ctx, &pt_c, &uv_c);
     dd__vertex_text(ctx, &pt_b, &uv_b);
+    dd__vertex_text(ctx, &pt_c, &uv_c);
   }
   dd_vertex_t *end = ctx->verts_data + ctx->verts_len;
 

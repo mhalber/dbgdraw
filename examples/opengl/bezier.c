@@ -254,7 +254,7 @@ void frame(app_state_t* state)
   
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
   glClearColor( 1.0f, 1.0f, 1.0f, 1.0f );
-  
+
   int32_t w, h;
   glfwGetWindowSize( window, &w, &h );
   
@@ -346,7 +346,7 @@ void frame(app_state_t* state)
   draw_points( dd_ctx, average_pts_d, NPTS-4, DBGDRAW_LIGHT_PURPLE, DBGDRAW_PURPLE, r*3.0f );
   
   draw_labels( dd_ctx, control_pts, control_pts_labels, NPTS,  DBGDRAW_BLACK, 5.0f );
-  
+
   dd_render( dd_ctx );
 }
 

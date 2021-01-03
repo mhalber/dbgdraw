@@ -1,5 +1,3 @@
-static const char *PROGRAM_NAME = "dbgdraw_frustum_culling";
-
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
 #define MSH_VEC_MATH_IMPLEMENTATION
@@ -125,7 +123,7 @@ init( app_state_t* state )
   glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, 4);
-  state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
+  state->window = glfwCreateWindow( win_width, win_height, "dbgdraw_ogl_frustum_culling", NULL, NULL );
   if( !state->window )
   {
     fprintf( stderr, "[ERROR] Failed to create window\n" );
@@ -143,11 +141,14 @@ init( app_state_t* state )
   }
     
   state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
-  dd_ctx_desc_t desc = { .max_vertices = 1024*200,
-                         .max_commands = 16,
-                         .detail_level = 2,
-                         .enable_frustum_cull = true,
-                         .enable_depth_test = true };
+  dd_ctx_desc_t desc = 
+  { 
+    .max_vertices = 1024*200,
+    .max_commands = 16,
+    .detail_level = 2,
+    .enable_frustum_cull = true,
+    .enable_depth_test = true 
+  };
   error = dd_init( state->dd_ctx, &desc );
     
   if( error )
@@ -172,117 +173,120 @@ init( app_state_t* state )
 void
 frame( app_state_t* state )
 {
-    GLFWwindow* window    = state->window;
-    dd_ctx_t* dd_ctx = state->dd_ctx;
-    msh_camera_t* cam     = state->camera;
+  GLFWwindow* window    = state->window;
+  dd_ctx_t* dd_ctx = state->dd_ctx;
+  msh_camera_t* cam     = state->camera;
+  
+  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+  glClearColor( 0.2f, 0.2f, 0.2f, 1.0f );
+  
+  int32_t win_width, win_height;
+  glfwGetWindowSize( window, &win_width, &win_height );
+  
+  input.prev_xpos = input.cur_xpos;
+  input.prev_ypos = input.cur_ypos;
+  glfwGetCursorPos( window, &input.cur_xpos, &input.cur_ypos );
+  msh_vec2_t scrn_p0 = msh_vec2( (float)input.prev_xpos, (float)input.prev_ypos );
+  msh_vec2_t scrn_p1 = msh_vec2( (float)input.cur_xpos, (float)input.cur_ypos );
     
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    glClearColor( 0.2f, 0.2f, 0.2f, 1.0f );
-    
-    int32_t win_width, win_height;
-    glfwGetWindowSize( window, &win_width, &win_height );
-    
-    input.prev_xpos = input.cur_xpos;
-    input.prev_ypos = input.cur_ypos;
-    glfwGetCursorPos( window, &input.cur_xpos, &input.cur_ypos );
-    msh_vec2_t scrn_p0 = msh_vec2( (float)input.prev_xpos, (float)input.prev_ypos );
-    msh_vec2_t scrn_p1 = msh_vec2( (float)input.cur_xpos, (float)input.cur_ypos );
-    
-    if( input.mouse_buttons[GLFW_MOUSE_BUTTON_1] )
+  if( input.mouse_buttons[GLFW_MOUSE_BUTTON_1] )
+  {
+    msh_camera_rotate( cam, scrn_p0, scrn_p1 );
+    msh_camera_update_view( cam );
+  }
+  
+  if( input.scroll_y )
+  {
+    msh_camera_zoom( cam, input.scroll_y );
+    msh_camera_update_view( cam );
+    if( cam->use_ortho ) { msh_camera_update_proj( cam ); }
+    input.scroll_y = 0.0;
+  }
+  
+  if( input.mouse_buttons[GLFW_MOUSE_BUTTON_2] )
+  {
+    msh_camera_pan( cam, scrn_p0, scrn_p1 );
+    msh_camera_update_view( cam );
+  }
+  
+  if( win_width != cam->viewport.z || win_height != cam->viewport.w )
+  {
+    cam->viewport.z = (float)win_width;
+    cam->viewport.w = (float)win_height;
+    msh_camera_update_proj( cam );
+    glViewport( (GLint)cam->viewport.x, (GLint)cam->viewport.y, (GLint)cam->viewport.z, (GLint)cam->viewport.w );
+  }
+  
+  dd_new_frame_info_t info = 
+  { 
+    .view_matrix       = cam->view.data,
+    .projection_matrix = cam->proj.data,
+    .viewport_size     = cam->viewport.data,
+    .vertical_fov      = cam->fovy,
+    .projection_type   = DBGDRAW_ORTHOGRAPHIC
+  };
+  dd_new_frame( dd_ctx, &info );
+  
+  static float angle = 0.0f;
+  if( angle > MSH_TWO_PI ) { angle -= (float)MSH_TWO_PI; }
+  angle += 0.02f;
+  float aspect_ratio = (float)win_width/win_height;
+  msh_mat4_t proj    = msh_perspective( (float)msh_deg2rad(45.0f), aspect_ratio, 0.25f, 1.75f );
+  msh_mat4_t view    = msh_mat4_identity();
+  view = msh_post_translate( view, msh_vec3( 1.0, 0.0, 0.0 ) );
+  view = msh_post_rotate( view, angle, msh_vec3_posy() );
+  
+  /* Switch the dbgdraw view/projection matrices to the one of a testing frustum */
+  memcpy( dd_ctx->proj.data, proj.data, sizeof(dd_ctx->proj));
+  memcpy( dd_ctx->view.data, view.data, sizeof(dd_ctx->view));
+  dd_extract_frustum_planes( dd_ctx );
+
+  /* Draw spheres */
+  float radius = 0.21f;
+  dd_mode_t modes[2] = {DBGDRAW_MODE_STROKE, DBGDRAW_MODE_FILL};
+  dd_color_t pass_colors[2] = {DBGDRAW_LIGHT_GREEN, DBGDRAW_GREEN };
+  dd_color_t cull_colors[2] = {DBGDRAW_LIGHT_RED, DBGDRAW_RED };
+  for( int32_t i = 0; i <= 1; ++i )
+  {
+    dd_begin_cmd( dd_ctx, modes[i] );
+    for( float x = -3 ; x <= 3; x += 0.5 )
     {
-        msh_camera_rotate( cam, scrn_p0, scrn_p1 );
-        msh_camera_update_view( cam );
-    }
-    
-    if( input.scroll_y )
-    {
-        msh_camera_zoom( cam, input.scroll_y );
-        msh_camera_update_view( cam );
-        if( cam->use_ortho ) { msh_camera_update_proj( cam ); }
-        input.scroll_y = 0.0;
-    }
-    
-    if( input.mouse_buttons[GLFW_MOUSE_BUTTON_2] )
-    {
-        msh_camera_pan( cam, scrn_p0, scrn_p1 );
-        msh_camera_update_view( cam );
-    }
-    
-    if( win_width != cam->viewport.z || win_height != cam->viewport.w )
-    {
-        cam->viewport.z = (float)win_width;
-        cam->viewport.w = (float)win_height;
-        msh_camera_update_proj( cam );
-        glViewport( (GLint)cam->viewport.x, (GLint)cam->viewport.y, (GLint)cam->viewport.z, (GLint)cam->viewport.w );
-    }
-    
-    dd_new_frame_info_t info = { .view_matrix       = cam->view.data,
-        .projection_matrix = cam->proj.data,
-        .viewport_size     = cam->viewport.data,
-        .vertical_fov      = cam->fovy,
-        .projection_type   = DBGDRAW_ORTHOGRAPHIC };
-    dd_new_frame( dd_ctx, &info );
-    
-    static float angle = 0.0f;
-    if( angle > MSH_TWO_PI ) { angle -= (GLint)MSH_TWO_PI; }
-    angle += 0.02f;
-    float aspect_ratio = (float)win_width/win_height;
-    msh_mat4_t proj    = msh_perspective( (float)msh_deg2rad(45.0f), aspect_ratio, 0.25f, 1.75f );
-    msh_mat4_t view    = msh_mat4_identity();
-    view = msh_post_translate( view, msh_vec3( 1.0, 0.0, 0.0 ) );
-    view = msh_post_rotate( view, angle, msh_vec3_posy() );
-    
-    /* Switch the dbgdraw view/projection matrices to the one of a testing frustum */
-    memcpy( dd_ctx->proj.data, proj.data, sizeof(dd_ctx->proj));
-    memcpy( dd_ctx->view.data, view.data, sizeof(dd_ctx->view));
-    dd_extract_frustum_planes( dd_ctx );
-    
-    /* Draw spheres */
-    float radius = 0.21f;
-    dd_mode_t modes[2] = {DBGDRAW_MODE_STROKE, DBGDRAW_MODE_FILL};
-    dd_color_t pass_colors[2] = {DBGDRAW_LIGHT_GREEN, DBGDRAW_GREEN };
-    dd_color_t cull_colors[2] = {DBGDRAW_LIGHT_RED, DBGDRAW_RED };
-    for( int32_t i = 0; i <= 1; ++i )
-    {
-        dd_begin_cmd( dd_ctx, modes[i] );
-        for( float x = -3 ; x <= 3; x += 0.5 )
+      for( float y = -3 ; y <= 3; y += 0.5 )
+      {
+        msh_vec3_t o = msh_vec3( x, 0.0, y );
+        
+        /* Draw green spheres that passed culling, and report if a sphere was culled */
+        dd_ctx->frustum_cull = 1;
+        dd_set_color( dd_ctx, pass_colors[i] );
+        int32_t status = dd_sphere( dd_ctx, o.data, radius );
+        
+        /* For culled spheres, disable culling and draw red sphere */
+        if( status == DBGDRAW_ERR_CULLED )
         {
-            for( float y = -3 ; y <= 3; y += 0.5 )
-            {
-                msh_vec3_t o = msh_vec3( x, 0.0, y );
-                
-                /* Draw green spheres that passed culling, and report if a sphere was culled */
-                dd_ctx->frustum_cull = 1;
-                dd_set_color( dd_ctx, pass_colors[i] );
-                int32_t status = dd_sphere( dd_ctx, o.data, radius );
-                
-                /* For culled spheres, disable culling and draw red sphere */
-                if( status == DBGDRAW_ERR_CULLED )
-                {
-                    dd_ctx->frustum_cull = 0;
-                    dd_set_color( dd_ctx, cull_colors[i] );
-                    dd_sphere( dd_ctx, o.data, radius );
-                }
-            }
+          dd_ctx->frustum_cull = 0;
+          dd_set_color( dd_ctx, cull_colors[i] );
+          dd_sphere( dd_ctx, o.data, radius );
         }
-        dd_end_cmd( dd_ctx );
+      }
     }
-    
-    /* Switch matrices back to main camera */
-    memcpy( dd_ctx->proj.data, cam->proj.data, sizeof(dd_ctx->proj));
-    memcpy( dd_ctx->view.data, cam->view.data, sizeof(dd_ctx->view));
-    
-    /* Draw the view frustum */
-    dd_set_color( dd_ctx, DBGDRAW_WHITE );
-    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-    dd_frustum( dd_ctx, view.data, proj.data );
     dd_end_cmd( dd_ctx );
-    
-    dd_set_color( dd_ctx, dd_rgbaf( 1.0f, 1.0f, 1.0f, 0.4f) );
-    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    dd_frustum( dd_ctx, view.data, proj.data );
-    dd_end_cmd( dd_ctx );
-    
-    dd_render( dd_ctx );
+  }
+  
+  /* Switch matrices back to main camera */
+  memcpy( dd_ctx->proj.data, cam->proj.data, sizeof(dd_ctx->proj));
+  memcpy( dd_ctx->view.data, cam->view.data, sizeof(dd_ctx->view));
+  
+  /* Draw the view frustum */
+  dd_set_color( dd_ctx, DBGDRAW_WHITE );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  dd_frustum( dd_ctx, view.data, proj.data );
+  dd_end_cmd( dd_ctx );
+  
+  dd_set_color( dd_ctx, dd_rgbaf( 1.0f, 1.0f, 1.0f, 0.4f) );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+  dd_frustum( dd_ctx, view.data, proj.data );
+  dd_end_cmd( dd_ctx );
+  
+  dd_render( dd_ctx );
 }
 

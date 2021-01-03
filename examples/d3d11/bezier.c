@@ -59,7 +59,8 @@ int main(void)
   return error;
 }
 
-int32_t init(app_state_t* state)
+int32_t
+init(app_state_t* state)
 {
   assert(state);
 
@@ -82,6 +83,10 @@ int32_t init(app_state_t* state)
     return 1;
   }
 
+  dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
+  backend->d3d11 = &state->d3d11;
+  state->dd_ctx.render_backend = backend;
+
   dd_ctx_desc_t desc = 
   { 
     .max_vertices = 1024*200,
@@ -91,14 +96,9 @@ int32_t init(app_state_t* state)
     .enable_default_font = true,
     .line_antialias_radius = 2.0f
   };
-  
-  dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
-  backend->d3d11 = &state->d3d11;
-  state->dd_ctx.render_backend = backend;
   error = dd_init( &state->dd_ctx, &desc );
   error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
   error = dd_init_font_from_file( &state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 20, 512, 512, &CMU_FONT_SMALL );
-
   if (error)
   {
     fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
@@ -111,42 +111,42 @@ int32_t init(app_state_t* state)
 void
 draw_line_segments( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, dd_color_t color, float width )
 {
-    dd_set_color( dd_ctx, color );
-    dd_set_primitive_size( dd_ctx, width );
-    
-    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-    for( int32_t i = 0; i < n_pts-1; ++i )
-    {
-        dd_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
-    }
-    dd_end_cmd( dd_ctx );
+  dd_set_color( dd_ctx, color );
+  dd_set_primitive_size( dd_ctx, width );
+  
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  for( int32_t i = 0; i < n_pts-1; ++i )
+  {
+      dd_line( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, dd_vec3( pts[i+1].x, pts[i+1].y, 0.0 ).data );
+  }
+  dd_end_cmd( dd_ctx );
 }
 
 void
 draw_points( dd_ctx_t* dd_ctx, dd_vec2_t* pts, int32_t n_pts, 
             dd_color_t pt_fill_color, dd_color_t pt_stroke_color, float radius )
 {
-    dd_ctx->detail_level = 3;
-    
-    dd_set_color( dd_ctx, pt_fill_color );
-    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
-    for( int32_t i = 0; i < n_pts ; ++i )
-    {
-        dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
-    }
-    dd_end_cmd( dd_ctx );
-    
-    
-    dd_set_color( dd_ctx, pt_stroke_color );
-    dd_set_primitive_size( dd_ctx, 2.0f );
-    dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
-    for( int32_t i = 0; i < n_pts ; ++i )
-    {
-        dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
-    }
-    dd_end_cmd( dd_ctx );
-    
-    dd_ctx->detail_level = 2;
+  dd_ctx->detail_level = 3;
+  
+  dd_set_color( dd_ctx, pt_fill_color );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_FILL );
+  for( int32_t i = 0; i < n_pts ; ++i )
+  {
+    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+  }
+  dd_end_cmd( dd_ctx );
+  
+  
+  dd_set_color( dd_ctx, pt_stroke_color );
+  dd_set_primitive_size( dd_ctx, 2.0f );
+  dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
+  for( int32_t i = 0; i < n_pts ; ++i )
+  {
+    dd_circle( dd_ctx, dd_vec3( pts[i].x, pts[i].y, 0.0 ).data, radius );
+  }
+  dd_end_cmd( dd_ctx );
+  
+  dd_ctx->detail_level = 2;
 }
 
 // Based on  https://blog.demofox.org/2015/07/05/the-de-casteljeau-algorithm-for-evaluating-bezier-curves/

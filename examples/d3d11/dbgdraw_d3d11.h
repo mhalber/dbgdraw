@@ -211,11 +211,10 @@ dd_backend_init( dd_ctx_t* ctx )
 
   ID3D11Device_CreateSamplerState(d3d11->device, &sampler_desc, &backend->font_texture_sampler);
 
-
   // Setup rasterizer state
   D3D11_RASTERIZER_DESC rasterizer_state_desc = 
   {
-    .FrontCounterClockwise = FALSE,
+    .FrontCounterClockwise = TRUE,
     .FillMode = D3D11_FILL_SOLID,
     .CullMode = D3D11_CULL_BACK
   };
@@ -832,11 +831,11 @@ dd__init_point_shader_source( const char** shdr_src )
       // make this static?
       int2 quad_infos[6];
       quad_infos[0] = int2(0, -1);
-      quad_infos[1] = int2(0,  1);
-      quad_infos[2] = int2(1,  1);
+      quad_infos[1] = int2(1,  1);
+      quad_infos[2] = int2(0,  1);
       quad_infos[3] = int2(0, -1);
-      quad_infos[4] = int2(1,  1);
-      quad_infos[5] = int2(1, -1);
+      quad_infos[4] = int2(1, -1);
+      quad_infos[5] = int2(1,  1);
       int2 quad_info = quad_infos[quad_idx];
 
       float2 dir = line_vector_1_unit;

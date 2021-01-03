@@ -230,6 +230,8 @@ dd_backend_render(dd_ctx_t *ctx)
     GLCHECK(glEnable(GL_DEPTH_TEST));
   }
   GLCHECK(glEnable(GL_BLEND));
+  GLCHECK(glCullFace(GL_BACK));
+  GLCHECK(glEnable(GL_CULL_FACE));
   GLCHECK(glEnable(GL_LINE_SMOOTH));
   GLCHECK(glEnable(GL_PROGRAM_POINT_SIZE));
   GLCHECK(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -624,8 +626,8 @@ void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_
         vec2 extension = extension_length * dir;
 
         int quad_id = gl_VertexID % 6;
-        ivec2 quad[6] = ivec2[6](ivec2(0, -1), ivec2(0, 1), ivec2(1, 1),
-                                 ivec2(0, -1), ivec2(1, 1), ivec2(1, -1));
+        ivec2 quad[6] = ivec2[6](ivec2(0, -1), ivec2(1, 1), ivec2(0, 1),
+                                 ivec2(0, -1), ivec2(1, -1), ivec2(1, 1));
         ivec2 quad_pos = quad[quad_id];
 
         v_line_width = (1.0 - quad_pos.x) * line_width_a + quad_pos.x * line_width_b;
