@@ -1,4 +1,4 @@
-// TODO(maciej): Investigate why d3d11 is not rendering the thin lines correctly.
+
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -33,19 +33,23 @@ int32_t init(app_state_t* state);
 void frame(app_state_t* state);
 void cleanup(app_state_t* state);
 
-int32_t 
+#define SIZE_X 31
+#define SIZE_Y 15
+static dd_instance_data_t instance_data[SIZE_Y][SIZE_X] = {{0}};
+
+int32_t
 main(void)
 {
   int32_t error = 0;
   app_state_t state = {0};
   error = init(&state);
-  if( error ) { goto main_return; }
+  if (error) { goto main_return; }
   d3d11_ctx_t* d3d11 = &state.d3d11;
 
   while (d3d11_process_events(&state.input))
   {
     d3d11_viewport(d3d11, 0, 0, d3d11->render_target_width, d3d11->render_target_height);
-    d3d11_clear(d3d11, 0.9f, 0.9f, 0.95f, 1.0f);
+    d3d11_clear(d3d11, 0.9f, 0.9f, 0.9f, 1.0f);
 
     frame(&state);
 
@@ -66,7 +70,7 @@ init(app_state_t* state)
   
   d3d11_ctx_desc_t d3d11_desc = 
   {
-    .win_title = "dbgdraw_d3d11_lines",
+    .win_title = "dbgdraw_d3d11_basic",
     .win_x = 100,
     .win_y = 100,
     .win_w = 640,
@@ -84,17 +88,29 @@ init(app_state_t* state)
   dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
   backend->d3d11 = &state->d3d11;
   state->dd_ctx.render_backend = backend;
-  dd_ctx_desc_t desc =
+  
+  dd_ctx_desc_t desc = 
   { 
     .max_vertices = 1024,
-    .max_commands = 16
+    .max_commands = 16,
+    .detail_level = 4
   };
   error = dd_init(&state->dd_ctx, &desc);
-  if (error)
+  if( error )
   {
-    fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
+    fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
     return 1;
   }
+
+  for (int32_t y = 0; y < SIZE_Y; ++y)
+  {
+    for (int32_t x = 0; x < SIZE_X; ++x)
+    {
+      instance_data[y][x].position = dd_vec3((x+1) * 20.0f, (y+1) * 20.0f, 0.0);
+      instance_data[y][x].color = dd_hsl( (x+0.001f)/SIZE_X * 360.0f, 0.8f, 0.5f);
+    }
+  }
+  
   return 0;
 }
 
@@ -107,9 +123,11 @@ void frame(app_state_t* state)
   int32_t w = d3d11->render_target_width;
   int32_t h = d3d11->render_target_height;
   msh_vec3_t cam_pos = msh_vec3(0, 0, 5);
-  msh_mat4_t view = msh_look_at(cam_pos, msh_vec3_zeros(), msh_vec3_posy());
-  msh_vec4_t viewport = msh_vec4(0.0f, 0.0f, (float)w, (float)h);
-  msh_mat4_t proj = msh_ortho(0.0f, (float)w, 0.0f, (float)h, 0.01f, 10.0f);
+  msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
+  msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
+  msh_mat4_t proj = msh_ortho( 0.0f, (float)w, 0.0f, (float)h, 0.01f, 10.0f );
+  proj = msh_ortho( 0.0f, (float)w, (float)h, 0.0f, 0.01f, 10.0f );
+
   dd_new_frame_info_t info = 
   { 
     .view_matrix       = view.data,
@@ -118,46 +136,22 @@ void frame(app_state_t* state)
     .vertical_fov      = (float)h,
     .projection_type   = DBGDRAW_ORTHOGRAPHIC
   };
-  dd_new_frame(dd_ctx, &info);
-  
-  dd_ctx->aa_radius = dd_vec2(2.0f, 2.0f);
-  dd_begin_cmd(dd_ctx, DBGDRAW_MODE_STROKE);
-  
-  float x = 30.0f;
-  float y = (float)h/2;
-  float line_width = 0.5f;
-  for (int32_t i = 0; i < 20 ; ++i)
-  {
-    dd_set_primitive_size(dd_ctx, line_width);
-    dd_line(dd_ctx, msh_vec3(x - 20.0f, y - 100.0f, 0.0f).data, msh_vec3(x+20.0f, y + 100.0f, 0.0f).data); 
-    x += 20.0f;
-    line_width += 0.5f;
-  }
-  
-  x += 100.0f;
-  float radius_a = 10.0f;
-  float radius_b = 100.0f;
-  float step = (float)DBGDRAW_TWO_PI / 36.0f;
-  dd_set_primitive_size(dd_ctx, 1.0f);
-  for (float theta = 0; theta < DBGDRAW_TWO_PI-step; theta += step)
-  {
-    float s = sinf(theta);
-    float t = cosf(theta);
-    dd_line(dd_ctx, 
-            msh_vec3(x + s * radius_a, y + t * radius_a, 0.0).data,
-            msh_vec3(x + s * radius_b, y + t * radius_b, 0.0).data);
-  }
-  
+  dd_new_frame( dd_ctx, &info );
+    
+  dd_ctx->aa_radius = dd_vec2( 10.0f, 0.0f );
+  dd_set_primitive_size(dd_ctx, 12.0f);
+
+  dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
+  dd_circle2d(dd_ctx, (float[2]){0.0, 0.0}, 7.5 );
+  dd_set_instance_data(dd_ctx, SIZE_X*SIZE_Y, &instance_data[0][0]);
   dd_end_cmd(dd_ctx);
-  
+    
   dd_render(dd_ctx);
 }
 
-void 
-cleanup(app_state_t* state)
+void cleanup( app_state_t* state )
 {
   assert(state);
-
   dd_term(&state->dd_ctx);
   d3d11_terminate(&state->d3d11);
   free(state->dd_ctx.render_backend);

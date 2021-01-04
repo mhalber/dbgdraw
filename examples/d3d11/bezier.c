@@ -256,20 +256,19 @@ void frame(app_state_t* state)
   int32_t h = d3d11->render_target_height;
   
   msh_vec3_t cam_pos = msh_vec3(0, 0, 5);
-  msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
-  msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
-  msh_mat4_t proj = msh_ortho( 0.0f, (float)w, 0.0f, (float)h, -100.0f, 100.0f );
+  msh_mat4_t view = msh_look_at(cam_pos, msh_vec3_zeros(), msh_vec3_posy());
+  msh_vec4_t viewport = msh_vec4(0.0f, 0.0f, (float)w, (float)h);
+  msh_mat4_t proj = msh_ortho(0.0f, (float)w, 0.0f, (float)h, -100.0f, 100.0f);
   
   dd_new_frame_info_t info =
   { 
-      .view_matrix       = view.data,
-      .projection_matrix = proj.data,
-      .viewport_size     = viewport.data,
-      .vertical_fov      = (float)h,
-      .projection_type   = DBGDRAW_ORTHOGRAPHIC
+    .view_matrix       = view.data,
+    .projection_matrix = proj.data,
+    .viewport_size     = viewport.data,
+    .vertical_fov      = (float)h,
+    .projection_type   = DBGDRAW_ORTHOGRAPHIC
   };
   dd_new_frame( dd_ctx, &info );
-  
   
   static float at = 0.0f;
   static float delta_t = 0.01f;
@@ -278,7 +277,6 @@ void frame(app_state_t* state)
   dd_vec2_t control_pts[NPTS] = { dd_vec2( 50.0f, 70.0f ), dd_vec2( 180.0f, 270.0f ),
       dd_vec2( 240.0f, 280.0f ), dd_vec2( 420.0f, 40.0f ), dd_vec2( 590.0f, 280.0f ) };
   char* control_pts_labels[NPTS] = { "P_0", "P_1", "P_2", "P_3", "P_4" };
-  
   
   float t = smoothstep( 0, 1, at );
   dd_vec2_t average_pts_a[NPTS-1];

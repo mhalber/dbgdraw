@@ -153,7 +153,6 @@ void frame(app_state_t* state)
   
   glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
   glClearColor( 0.3f, 0.3f, 0.45f, 1.0f );
-  glCullFace(GL_BACK);
   
   int32_t w, h;
   glfwGetWindowSize( window, &w, &h );
@@ -171,7 +170,7 @@ void frame(app_state_t* state)
     .projection_type   = DBGDRAW_ORTHOGRAPHIC 
   };
   dd_new_frame( dd_ctx, &info );
-  
+
   float size = 96.0f;
   float spacing = 26.0f;
   float x = spacing;

@@ -32,7 +32,8 @@ int32_t init(app_state_t* state);
 void frame(app_state_t* state);
 void cleanup(app_state_t* state);
 
-int main(void)
+int32_t
+main(void)
 {
   int32_t error = 0;
   app_state_t state = {0};
@@ -55,7 +56,8 @@ int main(void)
   return error;
 }
 
-int32_t init(app_state_t* state)
+int32_t 
+init(app_state_t* state)
 {
   assert(state);
 
@@ -77,8 +79,12 @@ int32_t init(app_state_t* state)
     fprintf(stderr, "[ERROR] Failed to initialize d3d11!\n");
     return 1;
   }
-
- dd_ctx_desc_t desc = 
+  
+  dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
+  backend->d3d11 = &state->d3d11;
+  state->dd_ctx.render_backend = backend;
+  
+  dd_ctx_desc_t desc = 
   { 
     .max_vertices = 32,
     .max_commands = 16,
@@ -88,10 +94,6 @@ int32_t init(app_state_t* state)
     .enable_default_font = false,
     .line_antialias_radius = 2.0f
   };
-  
-  dd_render_backend_t* backend = calloc(1, sizeof(dd_render_backend_t));
-  backend->d3d11 = &state->d3d11;
-  state->dd_ctx.render_backend = backend;
   error = dd_init( &state->dd_ctx, &desc);
   if (error)
   {

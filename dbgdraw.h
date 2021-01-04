@@ -1606,17 +1606,6 @@ void dd__arc_fill(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, i
     {
       if (ctx->cur_cmd->shading_type)
       {
-        dd__triangle_normal(ctx, center, &pt_a, &pt_b, &normal);
-      }
-      else
-      {
-        dd__triangle(ctx, center, &pt_a, &pt_b);
-      }
-    }
-    else
-    {
-      if (ctx->cur_cmd->shading_type)
-      {
         dd__triangle_normal(ctx, center, &pt_b, &pt_a, &normal);
       }
       else
@@ -1624,7 +1613,19 @@ void dd__arc_fill(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, i
         dd__triangle(ctx, center, &pt_b, &pt_a);
       }
     }
+    else
+    {
+      if (ctx->cur_cmd->shading_type)
+      {
+        dd__triangle_normal(ctx, center, &pt_a, &pt_b, &normal);
+      }
+      else
+      {
+        dd__triangle(ctx, center, &pt_a, &pt_b);
+      }
+    }
   }
+  // printf("%f %f %f\n", normal.x, normal.y, normal.y);
 }
 
 void dd__arc(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, int32_t resolution, uint8_t flip)
@@ -1804,7 +1805,7 @@ void dd__cone(dd_ctx_t *ctx, dd_vec3_t a, dd_vec3_t b, float radius, int32_t res
 
   dd_vec3_t zero_pt = dd_vec3(0.0f, 0.0f, 0.0f);
   dd_vertex_t *start_ptr = ctx->verts_data + ctx->verts_len;
-  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 1);
+  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 0);
   dd_vertex_t *end_ptr = ctx->verts_data + ctx->verts_len;
   dd__transform_verts(xform, start_ptr, end_ptr, has_normals);
 
@@ -2428,7 +2429,7 @@ dd__circle_ex(dd_ctx_t *ctx, float *center, float radius, uint8_t is_3d)
 int32_t
 dd_circle(dd_ctx_t *ctx, float *center, float radius)
 {
-  return dd__circle_ex(ctx, center, radius, 0);
+  return dd__circle_ex(ctx, center, radius, 1);
 }
 
 int32_t

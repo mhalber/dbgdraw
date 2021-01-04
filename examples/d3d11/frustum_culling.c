@@ -43,10 +43,10 @@ main(void)
   int32_t error = 0;
   app_state_t state = {0};
   error = init(&state);
-  if( error ) { goto main_return; }
+  if (error) { goto main_return; }
   d3d11_ctx_t* d3d11 = &state.d3d11;
 
-  while ( d3d11_process_events(&state.input) )
+  while (d3d11_process_events(&state.input))
   {
     d3d11_viewport(d3d11, 0, 0, d3d11->render_target_width, d3d11->render_target_height);
     d3d11_clear(d3d11, 0.2f, 0.2f, 0.2f, 1.0f);

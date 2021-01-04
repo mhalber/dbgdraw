@@ -27,6 +27,9 @@ static void d3d11_update_default_render_target(d3d11_ctx_t* d3d11);
 static void d3d11_destroy_default_render_target(d3d11_ctx_t* d3d11);
 
 static d3d11_app_input_t d3d11_input = {0};
+static uint16_t _d3d11_keycode_map[512];
+static uint8_t _d3d11_keycode_map_initialized = 0;
+void _d3d11_init_keycode_table(void);
 
 int32_t
 d3d11_init(d3d11_ctx_t* d3d11, const d3d11_ctx_desc_t* desc)
@@ -121,7 +124,7 @@ d3d11_init(d3d11_ctx_t* d3d11, const d3d11_ctx_desc_t* desc)
   }
 
   d3d11_create_default_render_target(d3d11);
-
+  _d3d11_init_keycode_table();
   return 0;
 }
 
@@ -145,13 +148,13 @@ d3d11_process_events(d3d11_app_input_t** input) {
   static BOOL quit_requested = FALSE;
   MSG msg;
   while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
-      if (WM_QUIT == msg.message) {
-          quit_requested = true;
-      }
-      else {
-          TranslateMessage(&msg);
-          DispatchMessageW(&msg);
-      }
+    if (WM_QUIT == msg.message) {
+      quit_requested = true;
+    }
+    else {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
   } 
   return !quit_requested;
 }
@@ -194,7 +197,12 @@ d3d11_present(d3d11_ctx_t* d3d11)
 static LRESULT CALLBACK 
 d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
 {
-  int z_delta;
+  // BYTE keyboard_state[256];
+  // GetKeyboardState(&keyboard_state);
+  // TODO(maciej). FIGURE OUT HOW DOES SOKOL DEAL WITH THIS. DISCREPANCY BETWEEN VIRTUAL CODE AND VOK
+  int32_t keycode;
+  int32_t z_delta;
+  // 16-23	The scan code. The value depends on the OEM.
   switch (message)
   {
     case WM_CLOSE:
@@ -202,11 +210,12 @@ d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM 
       break;
     case WM_KEYDOWN:
       if (w_param == VK_ESCAPE) { PostQuitMessage(0); }
-      d3d11_input.keys[w_param] = 1;
+      keycode = _d3d11_keycode_map[(int)(HIWORD(l_param)&0x1FF)];
+      d3d11_input.keys[keycode] = 1;
       break;
     case WM_KEYUP:
-      if (w_param == VK_ESCAPE) { PostQuitMessage(0); }
-      d3d11_input.keys[w_param] = 0;
+      keycode = _d3d11_keycode_map[(int)(HIWORD(l_param)&0x1FF)];
+      d3d11_input.keys[keycode] = 0;
       break;
     case WM_LBUTTONDOWN:
       d3d11_input.mouse.buttons[D3D11_APP_MOUSE_BUTTON_LEFT] = 1;
@@ -311,4 +320,129 @@ d3d11_update_default_render_target(d3d11_ctx_t* d3d11)
     IDXGISwapChain_ResizeBuffers(d3d11->swap_chain, 1, w, h, DXGI_FORMAT_B8G8R8A8_UNORM, 0);
     d3d11_create_default_render_target(d3d11);
   }
+}
+
+void _d3d11_init_keycode_table(void)
+{
+  if (_d3d11_keycode_map_initialized) {return;}
+  _d3d11_keycode_map_initialized = 1;
+  /* same as GLFW */
+  _d3d11_keycode_map[0x00B] = D3D11_APP_KEYCODE_0;
+  _d3d11_keycode_map[0x002] = D3D11_APP_KEYCODE_1;
+  _d3d11_keycode_map[0x003] = D3D11_APP_KEYCODE_2;
+  _d3d11_keycode_map[0x004] = D3D11_APP_KEYCODE_3;
+  _d3d11_keycode_map[0x005] = D3D11_APP_KEYCODE_4;
+  _d3d11_keycode_map[0x006] = D3D11_APP_KEYCODE_5;
+  _d3d11_keycode_map[0x007] = D3D11_APP_KEYCODE_6;
+  _d3d11_keycode_map[0x008] = D3D11_APP_KEYCODE_7;
+  _d3d11_keycode_map[0x009] = D3D11_APP_KEYCODE_8;
+  _d3d11_keycode_map[0x00A] = D3D11_APP_KEYCODE_9;
+  _d3d11_keycode_map[0x01E] = D3D11_APP_KEYCODE_A;
+  _d3d11_keycode_map[0x030] = D3D11_APP_KEYCODE_B;
+  _d3d11_keycode_map[0x02E] = D3D11_APP_KEYCODE_C;
+  _d3d11_keycode_map[0x020] = D3D11_APP_KEYCODE_D;
+  _d3d11_keycode_map[0x012] = D3D11_APP_KEYCODE_E;
+  _d3d11_keycode_map[0x021] = D3D11_APP_KEYCODE_F;
+  _d3d11_keycode_map[0x022] = D3D11_APP_KEYCODE_G;
+  _d3d11_keycode_map[0x023] = D3D11_APP_KEYCODE_H;
+  _d3d11_keycode_map[0x017] = D3D11_APP_KEYCODE_I;
+  _d3d11_keycode_map[0x024] = D3D11_APP_KEYCODE_J;
+  _d3d11_keycode_map[0x025] = D3D11_APP_KEYCODE_K;
+  _d3d11_keycode_map[0x026] = D3D11_APP_KEYCODE_L;
+  _d3d11_keycode_map[0x032] = D3D11_APP_KEYCODE_M;
+  _d3d11_keycode_map[0x031] = D3D11_APP_KEYCODE_N;
+  _d3d11_keycode_map[0x018] = D3D11_APP_KEYCODE_O;
+  _d3d11_keycode_map[0x019] = D3D11_APP_KEYCODE_P;
+  _d3d11_keycode_map[0x010] = D3D11_APP_KEYCODE_Q;
+  _d3d11_keycode_map[0x013] = D3D11_APP_KEYCODE_R;
+  _d3d11_keycode_map[0x01F] = D3D11_APP_KEYCODE_S;
+  _d3d11_keycode_map[0x014] = D3D11_APP_KEYCODE_T;
+  _d3d11_keycode_map[0x016] = D3D11_APP_KEYCODE_U;
+  _d3d11_keycode_map[0x02F] = D3D11_APP_KEYCODE_V;
+  _d3d11_keycode_map[0x011] = D3D11_APP_KEYCODE_W;
+  _d3d11_keycode_map[0x02D] = D3D11_APP_KEYCODE_X;
+  _d3d11_keycode_map[0x015] = D3D11_APP_KEYCODE_Y;
+  _d3d11_keycode_map[0x02C] = D3D11_APP_KEYCODE_Z;
+  _d3d11_keycode_map[0x028] = D3D11_APP_KEYCODE_APOSTROPHE;
+  _d3d11_keycode_map[0x02B] = D3D11_APP_KEYCODE_BACKSLASH;
+  _d3d11_keycode_map[0x033] = D3D11_APP_KEYCODE_COMMA;
+  _d3d11_keycode_map[0x00D] = D3D11_APP_KEYCODE_EQUAL;
+  _d3d11_keycode_map[0x029] = D3D11_APP_KEYCODE_GRAVE_ACCENT;
+  _d3d11_keycode_map[0x01A] = D3D11_APP_KEYCODE_LEFT_BRACKET;
+  _d3d11_keycode_map[0x00C] = D3D11_APP_KEYCODE_MINUS;
+  _d3d11_keycode_map[0x034] = D3D11_APP_KEYCODE_PERIOD;
+  _d3d11_keycode_map[0x01B] = D3D11_APP_KEYCODE_RIGHT_BRACKET;
+  _d3d11_keycode_map[0x027] = D3D11_APP_KEYCODE_SEMICOLON;
+  _d3d11_keycode_map[0x035] = D3D11_APP_KEYCODE_SLASH;
+  _d3d11_keycode_map[0x056] = D3D11_APP_KEYCODE_WORLD_2;
+  _d3d11_keycode_map[0x00E] = D3D11_APP_KEYCODE_BACKSPACE;
+  _d3d11_keycode_map[0x153] = D3D11_APP_KEYCODE_DELETE;
+  _d3d11_keycode_map[0x14F] = D3D11_APP_KEYCODE_END;
+  _d3d11_keycode_map[0x01C] = D3D11_APP_KEYCODE_ENTER;
+  _d3d11_keycode_map[0x001] = D3D11_APP_KEYCODE_ESCAPE;
+  _d3d11_keycode_map[0x147] = D3D11_APP_KEYCODE_HOME;
+  _d3d11_keycode_map[0x152] = D3D11_APP_KEYCODE_INSERT;
+  _d3d11_keycode_map[0x15D] = D3D11_APP_KEYCODE_MENU;
+  _d3d11_keycode_map[0x151] = D3D11_APP_KEYCODE_PAGE_DOWN;
+  _d3d11_keycode_map[0x149] = D3D11_APP_KEYCODE_PAGE_UP;
+  _d3d11_keycode_map[0x045] = D3D11_APP_KEYCODE_PAUSE;
+  _d3d11_keycode_map[0x146] = D3D11_APP_KEYCODE_PAUSE;
+  _d3d11_keycode_map[0x039] = D3D11_APP_KEYCODE_SPACE;
+  _d3d11_keycode_map[0x00F] = D3D11_APP_KEYCODE_TAB;
+  _d3d11_keycode_map[0x03A] = D3D11_APP_KEYCODE_CAPS_LOCK;
+  _d3d11_keycode_map[0x145] = D3D11_APP_KEYCODE_NUM_LOCK;
+  _d3d11_keycode_map[0x046] = D3D11_APP_KEYCODE_SCROLL_LOCK;
+  _d3d11_keycode_map[0x03B] = D3D11_APP_KEYCODE_F1;
+  _d3d11_keycode_map[0x03C] = D3D11_APP_KEYCODE_F2;
+  _d3d11_keycode_map[0x03D] = D3D11_APP_KEYCODE_F3;
+  _d3d11_keycode_map[0x03E] = D3D11_APP_KEYCODE_F4;
+  _d3d11_keycode_map[0x03F] = D3D11_APP_KEYCODE_F5;
+  _d3d11_keycode_map[0x040] = D3D11_APP_KEYCODE_F6;
+  _d3d11_keycode_map[0x041] = D3D11_APP_KEYCODE_F7;
+  _d3d11_keycode_map[0x042] = D3D11_APP_KEYCODE_F8;
+  _d3d11_keycode_map[0x043] = D3D11_APP_KEYCODE_F9;
+  _d3d11_keycode_map[0x044] = D3D11_APP_KEYCODE_F10;
+  _d3d11_keycode_map[0x057] = D3D11_APP_KEYCODE_F11;
+  _d3d11_keycode_map[0x058] = D3D11_APP_KEYCODE_F12;
+  _d3d11_keycode_map[0x064] = D3D11_APP_KEYCODE_F13;
+  _d3d11_keycode_map[0x065] = D3D11_APP_KEYCODE_F14;
+  _d3d11_keycode_map[0x066] = D3D11_APP_KEYCODE_F15;
+  _d3d11_keycode_map[0x067] = D3D11_APP_KEYCODE_F16;
+  _d3d11_keycode_map[0x068] = D3D11_APP_KEYCODE_F17;
+  _d3d11_keycode_map[0x069] = D3D11_APP_KEYCODE_F18;
+  _d3d11_keycode_map[0x06A] = D3D11_APP_KEYCODE_F19;
+  _d3d11_keycode_map[0x06B] = D3D11_APP_KEYCODE_F20;
+  _d3d11_keycode_map[0x06C] = D3D11_APP_KEYCODE_F21;
+  _d3d11_keycode_map[0x06D] = D3D11_APP_KEYCODE_F22;
+  _d3d11_keycode_map[0x06E] = D3D11_APP_KEYCODE_F23;
+  _d3d11_keycode_map[0x076] = D3D11_APP_KEYCODE_F24;
+  _d3d11_keycode_map[0x038] = D3D11_APP_KEYCODE_LEFT_ALT;
+  _d3d11_keycode_map[0x01D] = D3D11_APP_KEYCODE_LEFT_CONTROL;
+  _d3d11_keycode_map[0x02A] = D3D11_APP_KEYCODE_LEFT_SHIFT;
+  _d3d11_keycode_map[0x15B] = D3D11_APP_KEYCODE_LEFT_SUPER;
+  _d3d11_keycode_map[0x137] = D3D11_APP_KEYCODE_PRINT_SCREEN;
+  _d3d11_keycode_map[0x138] = D3D11_APP_KEYCODE_RIGHT_ALT;
+  _d3d11_keycode_map[0x11D] = D3D11_APP_KEYCODE_RIGHT_CONTROL;
+  _d3d11_keycode_map[0x036] = D3D11_APP_KEYCODE_RIGHT_SHIFT;
+  _d3d11_keycode_map[0x15C] = D3D11_APP_KEYCODE_RIGHT_SUPER;
+  _d3d11_keycode_map[0x150] = D3D11_APP_KEYCODE_DOWN;
+  _d3d11_keycode_map[0x14B] = D3D11_APP_KEYCODE_LEFT;
+  _d3d11_keycode_map[0x14D] = D3D11_APP_KEYCODE_RIGHT;
+  _d3d11_keycode_map[0x148] = D3D11_APP_KEYCODE_UP;
+  _d3d11_keycode_map[0x052] = D3D11_APP_KEYCODE_KP_0;
+  _d3d11_keycode_map[0x04F] = D3D11_APP_KEYCODE_KP_1;
+  _d3d11_keycode_map[0x050] = D3D11_APP_KEYCODE_KP_2;
+  _d3d11_keycode_map[0x051] = D3D11_APP_KEYCODE_KP_3;
+  _d3d11_keycode_map[0x04B] = D3D11_APP_KEYCODE_KP_4;
+  _d3d11_keycode_map[0x04C] = D3D11_APP_KEYCODE_KP_5;
+  _d3d11_keycode_map[0x04D] = D3D11_APP_KEYCODE_KP_6;
+  _d3d11_keycode_map[0x047] = D3D11_APP_KEYCODE_KP_7;
+  _d3d11_keycode_map[0x048] = D3D11_APP_KEYCODE_KP_8;
+  _d3d11_keycode_map[0x049] = D3D11_APP_KEYCODE_KP_9;
+  _d3d11_keycode_map[0x04E] = D3D11_APP_KEYCODE_KP_ADD;
+  _d3d11_keycode_map[0x053] = D3D11_APP_KEYCODE_KP_DECIMAL;
+  _d3d11_keycode_map[0x135] = D3D11_APP_KEYCODE_KP_DIVIDE;
+  _d3d11_keycode_map[0x11C] = D3D11_APP_KEYCODE_KP_ENTER;
+  _d3d11_keycode_map[0x037] = D3D11_APP_KEYCODE_KP_MULTIPLY;
+  _d3d11_keycode_map[0x04A] = D3D11_APP_KEYCODE_KP_SUBTRACT;
 }

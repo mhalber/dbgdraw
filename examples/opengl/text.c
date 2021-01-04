@@ -1,5 +1,3 @@
-static const char *PROGRAM_NAME = "debugdraw_text";
-
 #define MSH_VEC_MATH_INCLUDE_LIBC_HEADERS
 #define MSH_VEC_MATH_IMPLEMENTATION
 #define GLFW_INCLUDE_NONE
@@ -26,8 +24,8 @@ static const char *PROGRAM_NAME = "debugdraw_text";
 #endif
 
 typedef struct {
-    GLFWwindow* window;
-    dd_ctx_t* dd_ctx;
+	GLFWwindow* window;
+	dd_ctx_t* dd_ctx;
 } app_state_t;
 
 int32_t init( app_state_t* state );
@@ -37,72 +35,75 @@ void cleanup( app_state_t* state );
 int32_t
 main( void )
 {
-    int32_t error = 0;
-    app_state_t* state = calloc( 1, sizeof(app_state_t) );
-    
-    error = init( state );
-    if( error ) { goto main_return; }
-    
-    GLFWwindow* window = state->window;
-    
-    while( !glfwWindowShouldClose( window ) )
-    {
-        frame( state );
-        
-        glfwSwapBuffers( window );
-        glfwPollEvents();
-    }
-    
-    main_return:
-    cleanup( state );
-    return error;
+	int32_t error = 0;
+	app_state_t* state = calloc(1, sizeof(app_state_t));
+	
+	error = init(state);
+	if (error) { goto main_return; }
+	
+	GLFWwindow* window = state->window;
+	
+	while (!glfwWindowShouldClose(window))
+	{
+		frame(state);
+		
+		glfwSwapBuffers(window);
+		glfwPollEvents();
+	}
+	
+	main_return:
+	cleanup(state);
+	return error;
 }
-
 
 static int32_t TRUENO_FONT, CMU_FONT, ANAKTORIA_FONT;
 
 int32_t
-init( app_state_t* state ) {
+init( app_state_t* state )
+{
 	int32_t error = 0;
 	
 	error = !(glfwInit());
-	if( error )
+	if (error)
 	{
-		fprintf( stderr, "[ERROR] Failed to initialize GLFW library!\n" );
+		fprintf(stderr, "[ERROR] Failed to initialize GLFW library!\n");
 		return 1;
 	}
 	
 	int32_t win_width = 640, win_height = 320;
-	glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR );
-	glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR );
-	glfwWindowHint( GLFW_RESIZABLE, GL_FALSE );
-	glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
-	glfwWindowHint( GLFW_SAMPLES, 4 );
-	state->window = glfwCreateWindow( win_width, win_height, PROGRAM_NAME, NULL, NULL );
-	if( !state->window )
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, DD_GL_VERSION_MAJOR);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, DD_GL_VERSION_MINOR);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SAMPLES, 4);
+	state->window = glfwCreateWindow(win_width, win_height, "debugdraw_ogl_text", NULL, NULL);
+	if(!state->window)
 	{
-		fprintf( stderr, "[ERROR] Failed to create window\n" );
+		fprintf(stderr, "[ERROR] Failed to create window\n");
 		return 1;
 	}
 	
-	glfwMakeContextCurrent( state->window );
+	glfwMakeContextCurrent(state->window);
 	if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress))
 	{
-		fprintf( stderr, "[ERROR] Failed to initialize OpenGL context!\n" );
+		fprintf(stderr, "[ERROR] Failed to initialize OpenGL context!\n");
 		return 1;
 	}
 	
-	state->dd_ctx = calloc( 1, sizeof(dd_ctx_t) );
-	dd_ctx_desc_t desc = { .max_vertices = 1024*50,
-												 .max_commands = 32 };
-	error = dd_init( state->dd_ctx, &desc );
-	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/TruenoLt.otf", "Trueno", 26, 512, 512, &TRUENO_FONT );
-	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
-	error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/Anaktoria.ttf", "ANAKTORIA", 32, 512, 512, &ANAKTORIA_FONT );
-
-	if( error )
+	state->dd_ctx = calloc(1, sizeof(dd_ctx_t));
+	dd_ctx_desc_t desc = 
 	{
-		fprintf( stderr, "[ERROR] Failed to initialize dbgdraw library!\n" );
+		.max_vertices = 1024*50,
+		.max_commands = 32
+	};
+	error = dd_init(state->dd_ctx, &desc);
+	error = dd_init_font_from_file(state->dd_ctx, "examples/fonts/TruenoLt.otf", "Trueno", 26, 512, 512, &TRUENO_FONT);
+	error = dd_init_font_from_file(state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT);
+	error = dd_init_font_from_file(state->dd_ctx, "examples/fonts/Anaktoria.ttf", "ANAKTORIA", 32, 512, 512, &ANAKTORIA_FONT);
+
+	if (error)
+	{
+		fprintf(stderr, "[ERROR] Failed to initialize dbgdraw library!\n");
 		return 1;
 	}
 	
@@ -110,7 +111,8 @@ init( app_state_t* state ) {
 }
 
 
-void frame(app_state_t* state) 
+void 
+frame(app_state_t* state) 
 {
 	GLFWwindow* window    = state->window;
 	dd_ctx_t* dd_ctx = state->dd_ctx;
@@ -126,12 +128,14 @@ void frame(app_state_t* state)
 	msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
 	msh_mat4_t proj = msh_ortho( -w/2.0f, w/2.0f, -h/2.0f, h/2.0f, 0.01f, 10.0f );
 
-	dd_new_frame_info_t frame_info = { 
-			.view_matrix       = view.data,
-			.projection_matrix = proj.data,
-			.viewport_size     = viewport.data,
-			.vertical_fov      = (float)h,
-			.projection_type   = DBGDRAW_ORTHOGRAPHIC };
+	dd_new_frame_info_t frame_info = 
+	{ 
+		.view_matrix       = view.data,
+		.projection_matrix = proj.data,
+		.viewport_size     = viewport.data,
+		.vertical_fov      = (float)h,
+		.projection_type   = DBGDRAW_ORTHOGRAPHIC 
+	};
 	dd_new_frame( dd_ctx, &frame_info );
 	
 	int32_t base_x = -w/2;

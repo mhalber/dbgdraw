@@ -4,6 +4,7 @@
 #define DBGDRAW_D3D11_MAX_FONTS 16
 
 // TODO(maciej): Compress some of the repeated function calls
+// TODO(maciej): Ensure proper polygon offset that mirrors OGL implementation
 
 typedef struct dd_render_backend
 {
@@ -691,11 +692,12 @@ dd__init_point_shader_source( const char** shdr_src )
 
       float2 offsets[3];
       offsets[0] = float2(-v.size, -v.size);
-      offsets[1] = float2(-v.size,  3*v.size);
-      offsets[2] = float2( 3*v.size, -v.size);
+      offsets[1] = float2( 3*v.size, -v.size);
+      offsets[2] = float2(-v.size,  3*v.size);
       float2 offset = offsets[vertex_idx%3];
 
       float4 clip_pos = mul(mvp, float4(v.pos, 1.0f));
+      clip_pos.z -= 0.0001; // Bit of a hack
       float2 ndc_pos = clip_pos.xy / clip_pos.w;
       float2 viewport_pos = float2(ndc_pos.x*width, ndc_pos.y*height);
       viewport_pos += offset;
