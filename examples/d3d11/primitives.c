@@ -1,7 +1,3 @@
-//TODO(maciej): Figure out why the depth buffer is not working
-//TODO(maciej): Figure out why points are not being rendered
-
-
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -31,7 +27,6 @@
 #include "dbgdraw.h"
 #include "overlay.h"
 #include "dbgdraw_d3d11.h"
-
 
 typedef struct app_state {
   d3d11_ctx_t d3d11;
@@ -116,7 +111,7 @@ init(app_state_t* state)
 
   dd_ctx_desc_t desc_overlay = 
   { 
-    .max_vertices = 32,
+    .max_vertices = 1024,
     .max_commands = 16,
     .detail_level = 2,
     .enable_frustum_cull = false,
@@ -131,7 +126,7 @@ init(app_state_t* state)
   }
     
   msh_camera_init(&state->camera, &(msh_camera_desc_t){ 
-                      .eye       = msh_vec3(-3.0f, 3.5f, -8.0f),
+                      .eye       = msh_vec3(3.0f, 3.5f, 8.0f),
                       .center    = msh_vec3_zeros(),
                       .up        = msh_vec3_posy(),
                       .viewport  = msh_vec4(0, 0, (float)d3d11_desc.win_w, (float)d3d11_desc.win_h),
@@ -199,8 +194,8 @@ void frame(app_state_t* state)
     msh_camera_update_proj( cam );
   }
   
-  static int32_t show_lines   = 0;
-  static int32_t show_solid   = 1;
+  static int32_t show_lines   = 1;
+  static int32_t show_solid   = 0;
   static int32_t show_points  = 0;
   static int32_t shading_mode = (int32_t)DBGDRAW_SHADING_NONE;
   static int32_t show_overlay = 1;
@@ -265,11 +260,13 @@ void frame(app_state_t* state)
     }
     
     dd_begin_cmd( primitives, draw_mode );
-    cur_loc = msh_vec3( -3, 0, 0 );
+    cur_loc = msh_vec3( 3, 0, 0 );
     dd_set_color( primitives, *color );
-    dd_aabb( primitives, msh_vec3_add(cur_loc, min_pt).data, msh_vec3_add(cur_loc, max_pt).data );
+    msh_vec3_t v0 = msh_vec3_add(cur_loc, min_pt);
+    msh_vec3_t v1 = msh_vec3_add(cur_loc, max_pt);
+    dd_aabb( primitives, v0.data, v1.data );
     
-    cur_loc = msh_vec3( -1, 0, 0 );
+    cur_loc = msh_vec3( 1, 0, 0 );
     dd_set_color( primitives, *color );
     msh_mat3_t m = msh_mat3_identity();
     m.col[0] = msh_vec3_normalize( msh_vec3( 1.5, 0.0, 0.5 ) );
@@ -279,52 +276,51 @@ void frame(app_state_t* state)
     m.col[2] = msh_vec3_scalar_mul( m.col[2], 0.5 );
     dd_obb( primitives, cur_loc.data, m.data );
     
-    cur_loc = msh_vec3( 1, 0, 0 );
+    cur_loc = msh_vec3( -1, 0, 0 );
     view    = msh_look_at( msh_vec3_add( cur_loc, msh_vec3( 0.0f, 0.0f, 1.0f ) ),
                           cur_loc,
                           msh_vec3(  0.0f, 1.0f, 0.0f ) );
     dd_set_color( primitives, *color );
     dd_frustum( primitives, view.data, proj.data );
     
-    cur_loc = msh_vec3( 3, 0, 0 );
+    cur_loc = msh_vec3( -3, 0, 0 );
     dd_set_color( primitives, *color );
-    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(  -0.5,  -0.5, 0.0 ) ).data,
-            msh_vec3_add(cur_loc, msh_vec3(  -0.5,  0.5, 0.0 ) ).data,
-            msh_vec3_add(cur_loc, msh_vec3(  0.5, 0.5, 0.0 ) ).data,
-            msh_vec3_add(cur_loc, msh_vec3(  0.5, -0.5, 0.0 ) ).data );
+    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3( -0.5, -0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5, -0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5,  0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3( -0.5,  0.5, 0.0 ) ).data );
     color++;
     
-    cur_loc = msh_vec3( -3, 0, -2 );
+    cur_loc = msh_vec3( 3, 0, 2 );
     dd_set_color( primitives, *color );
     dd_circle( primitives, cur_loc.data, 0.5f );
     
-    
-    cur_loc = msh_vec3( -1, 0, -2 );
+    cur_loc = msh_vec3( 1, 0, 2 );
     dd_set_color( primitives, *color );
     dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI*0.8 );
     
-    cur_loc = msh_vec3( 1, 0, -2 );
+    cur_loc = msh_vec3( -1, 0, 2 );
     dd_set_color( primitives, *color );
     dd_sphere( primitives, cur_loc.data, 0.5f );
 
-    cur_loc = msh_vec3( 3, 0, -2 );
+    cur_loc = msh_vec3( -3, 0, 2 );
     dd_set_color( primitives, *color );
     dd_torus( primitives, cur_loc.data, 0.5f, 0.1f );
     color++;
     
-    cur_loc = msh_vec3( -3, 0, 2 );
+    cur_loc = msh_vec3( 3, 0, -2 );
     dd_set_color( primitives, *color );
     dd_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
     
-    cur_loc = msh_vec3( -1, 0, 2 );
+    cur_loc = msh_vec3( 1, 0, -2 );
     dd_set_color( primitives, *color );
     dd_cone( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
     
-    cur_loc = msh_vec3( 1, 0, 2 );
+    cur_loc = msh_vec3( -1, 0, -2 );
     dd_set_color( primitives, *color );
     dd_conical_frustum( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f, 0.25f );
     
-    cur_loc = msh_vec3(  3, 0, 2 );
+    cur_loc = msh_vec3( -3, 0, -2 );
     dd_set_color( primitives, *color );
     dd_arrow( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.3f, 0.45f, 0.25f );
     

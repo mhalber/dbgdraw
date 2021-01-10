@@ -3,7 +3,6 @@
 
 #define DBGDRAW_D3D11_MAX_FONTS 16
 
-// TODO(maciej): Compress some of the repeated function calls
 // TODO(maciej): Ensure proper polygon offset that mirrors OGL implementation
 
 typedef struct dd_render_backend
@@ -42,6 +41,7 @@ typedef struct dd_render_backend
 typedef struct dd_base_cb_data
 {
   dd_mat4_t mvp;
+  dd_mat4_t normal_matrix;
   dd_vec4_t viewport;
   dd_vec2_t aa_radius;
   uint32_t shading_type;
@@ -56,6 +56,36 @@ ID3DBlob* dd__d3d11_compile_shader( const char* source, const char* target, cons
 void dd__init_fill_shader_source( const char **shdr_src );
 void dd__init_stroke_shader_source( const char **shdr_src );
 void dd__init_point_shader_source( const char **shdr_src );
+
+void 
+dd__d3d11_create_dynamic_buffer( ID3D11Device* device, ID3D11Buffer** buffer, ID3D11ShaderResourceView** buffer_srv,
+                           uint32_t buffer_size, uint32_t num_elements, UINT flag )
+{
+  D3D11_BUFFER_DESC vb_desc = 
+  {
+    .ByteWidth      = buffer_size,
+    .Usage          = D3D11_USAGE_DYNAMIC,
+    .BindFlags      = D3D11_BIND_SHADER_RESOURCE | flag,
+    .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
+    .MiscFlags      = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS
+  };
+  HRESULT hr = ID3D11Device_CreateBuffer(device, &vb_desc, NULL, buffer);
+  assert(SUCCEEDED(hr));
+
+  D3D11_SHADER_RESOURCE_VIEW_DESC vb_view_desc = 
+  {
+    .Format = DXGI_FORMAT_R32_TYPELESS,
+    .ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX,
+    .BufferEx = 
+    {
+      .FirstElement = 0,
+      .NumElements = num_elements,
+      .Flags = D3D11_BUFFEREX_SRV_FLAG_RAW,
+    }
+  };
+  hr = ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource*)(*buffer), &vb_view_desc, buffer_srv);
+  assert(SUCCEEDED(hr));  
+}
 
 int32_t dd_backend_init( dd_ctx_t* ctx );
 int32_t dd_backend_term( dd_ctx_t* ctx );
@@ -148,57 +178,20 @@ dd_backend_init( dd_ctx_t* ctx )
 
   // Create the vertex buffer
   backend->vertex_buffer_size = ctx->verts_cap * sizeof(dd_vertex_t);
-  D3D11_BUFFER_DESC vb_desc = 
-  {
-    .ByteWidth      = backend->vertex_buffer_size,
-    .Usage          = D3D11_USAGE_DYNAMIC,
-    .BindFlags      = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER,
-    .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
-    .MiscFlags      = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS
-  };
-  hr = ID3D11Device_CreateBuffer(d3d11->device, &vb_desc, NULL, &backend->vertex_buffer);
-  assert(SUCCEEDED(hr));
-
-  D3D11_SHADER_RESOURCE_VIEW_DESC vb_view_desc = 
-  {
-    .Format = DXGI_FORMAT_R32_TYPELESS,
-    .ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX,
-    .BufferEx = 
-    {
-      .FirstElement = 0,
-      .NumElements = (ctx->verts_cap * sizeof(dd_vertex_t)) / 4, // why divide by 4??
-      .Flags = D3D11_BUFFEREX_SRV_FLAG_RAW,
-    }
-  };
-  hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->vertex_buffer, &vb_view_desc, &backend->vertex_buffer_view);
-  assert(SUCCEEDED(hr));
+  dd__d3d11_create_dynamic_buffer( d3d11->device, 
+                                   &backend->vertex_buffer, &backend->vertex_buffer_view,
+                                   backend->vertex_buffer_size,
+                                   ((ctx->verts_cap * sizeof(dd_vertex_t)) / 4),
+                                   D3D11_BIND_VERTEX_BUFFER );
 
   // Create the instance buffer
   backend->instance_buffer_size = ctx->instance_cap * sizeof(dd_instance_data_t);
-  D3D11_BUFFER_DESC ib_desc = 
-  {
-    .ByteWidth      = backend->instance_buffer_size,
-    .Usage          = D3D11_USAGE_DYNAMIC,
-    .BindFlags      = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER,
-    .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
-    .MiscFlags      = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS
-  };
-  hr = ID3D11Device_CreateBuffer(d3d11->device, &ib_desc, NULL, &backend->instance_buffer);
-  assert(SUCCEEDED(hr));
-
-  D3D11_SHADER_RESOURCE_VIEW_DESC ib_view_desc = 
-  {
-    .Format = DXGI_FORMAT_R32_TYPELESS,
-    .ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX,
-    .BufferEx = 
-    {
-      .FirstElement = 0,
-      .NumElements = (ctx->instance_cap * sizeof(dd_instance_data_t)) / 4, // why divide by 4??
-      .Flags = D3D11_BUFFEREX_SRV_FLAG_RAW,
-    }
-  };
-  hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->instance_buffer, &ib_view_desc, &backend->instance_buffer_view);
-  assert(SUCCEEDED(hr));
+  dd__d3d11_create_dynamic_buffer( d3d11->device, 
+                                   &backend->instance_buffer, 
+                                   &backend->instance_buffer_view,
+                                   backend->instance_buffer_size,  
+                                   ((ctx->instance_cap * sizeof(dd_instance_data_t)) / 4), 
+                                   D3D11_BIND_VERTEX_BUFFER );
 
   // Setup sampler    
   D3D11_SAMPLER_DESC sampler_desc = 
@@ -209,8 +202,8 @@ dd_backend_init( dd_ctx_t* ctx )
     .AddressW       = D3D11_TEXTURE_ADDRESS_WRAP,
     .ComparisonFunc = D3D11_COMPARISON_NEVER,
   };
-
-  ID3D11Device_CreateSamplerState(d3d11->device, &sampler_desc, &backend->font_texture_sampler);
+  hr = ID3D11Device_CreateSamplerState(d3d11->device, &sampler_desc, &backend->font_texture_sampler);
+  assert(SUCCEEDED(hr));
 
   // Setup rasterizer state
   D3D11_RASTERIZER_DESC rasterizer_state_desc = 
@@ -303,29 +296,12 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     backend->vertex_buffer_size = ctx->verts_cap * sizeof(dd_vertex_t);
     ID3D11Buffer_Release( backend->vertex_buffer );
     ID3D11ShaderResourceView_Release( backend->vertex_buffer_view );
-    D3D11_BUFFER_DESC db_desc = 
-    {
-      .ByteWidth      = backend->vertex_buffer_size,
-      .Usage          = D3D11_USAGE_DYNAMIC,
-      .BindFlags      = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_VERTEX_BUFFER,
-      .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
-      .MiscFlags      = D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS
-    };
-    HRESULT hr = ID3D11Device_CreateBuffer(d3d11->device, &db_desc, NULL, &backend->vertex_buffer);
-    assert(SUCCEEDED(hr));
-    D3D11_SHADER_RESOURCE_VIEW_DESC db_view_desc = 
-    {
-      .Format = DXGI_FORMAT_R32_TYPELESS,
-      .ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX,
-      .BufferEx = 
-      {
-        .FirstElement = 0,
-        .NumElements = (ctx->verts_cap * sizeof(dd_vertex_t)) / 4,
-        .Flags = D3D11_BUFFEREX_SRV_FLAG_RAW,
-      }
-    };
-    hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->vertex_buffer, &db_view_desc, &backend->vertex_buffer_view);
-    assert(SUCCEEDED(hr));
+
+    dd__d3d11_create_dynamic_buffer( d3d11->device, 
+                                     &backend->vertex_buffer, &backend->vertex_buffer_view,
+                                     backend->vertex_buffer_size,
+                                     ((ctx->verts_cap * sizeof(dd_vertex_t)) / 4),
+                                     D3D11_BIND_VERTEX_BUFFER );
   }
 
   // TODO(maciej): Set vertex data dirty somehow?
@@ -359,7 +335,18 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     if (cmd->instance_count && cmd->instance_data )
     {
       num_buffers = 2;
-      // TODO(maciej): Set instances dirty somehow?
+      if (backend->instance_buffer_size < ctx->instance_cap * sizeof(dd_instance_data_t))
+      {
+        backend->instance_buffer_size = ctx->instance_cap * sizeof(dd_instance_data_t);
+        ID3D11Buffer_Release( backend->instance_buffer );
+        ID3D11ShaderResourceView_Release( backend->instance_buffer_view );
+        dd__d3d11_create_dynamic_buffer( d3d11->device, 
+                                         &backend->instance_buffer, 
+                                         &backend->instance_buffer_view,
+                                         backend->instance_buffer_size,  
+                                         ((ctx->instance_cap * sizeof(dd_instance_data_t)) / 4), 
+                                         D3D11_BIND_VERTEX_BUFFER );
+      }
       D3D11_MAPPED_SUBRESOURCE instance_buffer_data = {0};
       ID3D11DeviceContext_Map( d3d11->device_context, (ID3D11Resource*)backend->instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &instance_buffer_data );
       memcpy( instance_buffer_data.pData, cmd->instance_data, cmd->instance_count*sizeof(dd_instance_data_t) );
@@ -371,6 +358,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     dd_cb_data_t cb_data = 
     { 
       .mvp = mvp, 
+      .normal_matrix = mvp,  // TODO(maciej): Make this actual normal matrix
       .viewport = ctx->viewport,
       .aa_radius = ctx->aa_radius,
       .shading_type = (uint32_t)cmd->shading_type, 
@@ -515,6 +503,7 @@ dd__init_fill_shader_source( const char** shdr_src )
     cbuffer vs_uniforms
     {
       float4x4 mvp;
+      float4x4 normal_matrix;
       float4 viewport;
       float2 aa_radius;         // unused
       uint shading_type;
@@ -547,9 +536,8 @@ dd__init_fill_shader_source( const char** shdr_src )
       if (instancing_enabled == 1) { pos = input.instance_pos + input.pos_size.xyz; color = input.instance_color + input.color;}
       else                         { pos = input.pos_size.xyz; color = input.color; }
       if (shading_type == 0)       { uv_or_normal = input.uv_or_normal; }
-      else                         { uv_or_normal = mul(mvp, float4(input.uv_or_normal, 0.0)).xyz; } // TODO(maciej): Normal matrix
+      else                         { uv_or_normal = mul(normal_matrix, float4(input.uv_or_normal, 0.0)).xyz; }
     
-
       vs_out output;
       output.pos = mul( mvp, float4(pos, 1.0f) );
       output.uv_or_normal = uv_or_normal;
@@ -589,6 +577,7 @@ dd__init_point_shader_source( const char** shdr_src )
     cbuffer vs_uniforms
     {
       float4x4 mvp;
+      float4x4 normal_matrix;
       float4 viewport;
       float2 aa_radius;
       uint shading_type;

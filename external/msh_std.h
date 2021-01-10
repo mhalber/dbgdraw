@@ -565,8 +565,7 @@ MSHDEF int  msh_discrete_distribution_sample(msh_discrete_distrib_t* ctx);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Printing Helpers
-// TODOs: Helpers
-///  /////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void
 msh_print_progress_bar( char* prefix, char* suffix, uint64_t iter, uint64_t total, int32_t len )
@@ -1256,7 +1255,6 @@ msh_compute_stddev( float mean, float *vals, int n_vals )
     return (float)sqrt( sq_sum / (float)n_vals - mean * mean );
 }
 
-// TODO(maciej): More analytical distributions in the future, like Poisson etc.
 MSHDEF float
 msh_gauss1d( float x, float mu, float sigma )
 {

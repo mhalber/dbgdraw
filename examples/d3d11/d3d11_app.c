@@ -1,5 +1,8 @@
 /* This file is modelled after the d3d11entry.c from sokol_gfx, by Andre Weissflog (@floooh)*/
 
+
+// TODO(maciej): Fix mouse controls.
+
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -197,12 +200,8 @@ d3d11_present(d3d11_ctx_t* d3d11)
 static LRESULT CALLBACK 
 d3d11_window_procedure(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param)
 {
-  // BYTE keyboard_state[256];
-  // GetKeyboardState(&keyboard_state);
-  // TODO(maciej). FIGURE OUT HOW DOES SOKOL DEAL WITH THIS. DISCREPANCY BETWEEN VIRTUAL CODE AND VOK
   int32_t keycode;
   int32_t z_delta;
-  // 16-23	The scan code. The value depends on the OEM.
   switch (message)
   {
     case WM_CLOSE:

@@ -1,4 +1,5 @@
 // TODO(maciej): Investigate why d3d11 is not rendering the thin lines correctly.
+
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE

@@ -1512,6 +1512,7 @@ void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta,
   dd_vec3_t pt_a = dd_vec3(center->x, center->y, center->z);
   dd_vec3_t pt_b = dd_vec3(center->x, center->y + radius, center->z);
 
+  int32_t init_offset = ctx->cur_cmd->base_index + ctx->cur_cmd->vertex_count;
   int32_t full_circle = (int32_t)(!(theta < DBGDRAW_TWO_PI));
   if (!full_circle)
   {
@@ -1556,7 +1557,7 @@ void dd__arc_stroke(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta,
   {
     /* This is an ugly fix to allow non-broken lines.
        We add an extra segment, and we modify its positions to lie on a segment, not vertex. */
-    dd_vertex_t* v1 = ctx->verts_data + ctx->cur_cmd->base_index;
+    dd_vertex_t* v1 = ctx->verts_data + init_offset;
     dd_vertex_t* v2 = v1 + 1;
     dd_vec3_t p1 = v1->pos;
     dd_vec3_t p2 = v2->pos;
@@ -1589,10 +1590,10 @@ void dd__arc_fill(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, i
     oy1 = radius * DBGDRAW_COS(theta1);
     oy2 = radius * DBGDRAW_COS(theta2);
 
-    pt_a.x = center->x + ox1;
-    pt_a.y = center->y + oy1;
-    pt_b.x = center->x + ox2;
-    pt_b.y = center->y + oy2;
+    pt_a.x = center->x + ox2;
+    pt_a.y = center->y + oy2;
+    pt_b.x = center->x + ox1;
+    pt_b.y = center->y + oy1;
     if (i == 0 && ctx->cur_cmd->shading_type)
     {
       normal = dd_vec3_normalize(dd_vec3_cross(dd_vec3_sub(pt_b, *center), dd_vec3_sub(pt_a, *center)));
@@ -1805,7 +1806,7 @@ void dd__cone(dd_ctx_t *ctx, dd_vec3_t a, dd_vec3_t b, float radius, int32_t res
 
   dd_vec3_t zero_pt = dd_vec3(0.0f, 0.0f, 0.0f);
   dd_vertex_t *start_ptr = ctx->verts_data + ctx->verts_len;
-  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 0);
+  dd__arc(ctx, &zero_pt, 1.0, (float)DBGDRAW_TWO_PI, resolution, 1);
   dd_vertex_t *end_ptr = ctx->verts_data + ctx->verts_len;
   dd__transform_verts(xform, start_ptr, end_ptr, has_normals);
 
@@ -1860,7 +1861,7 @@ void dd__conical_frustum(dd_ctx_t *ctx, dd_vec3_t a, dd_vec3_t b, float radius_a
   dd_mat4_t xform_b = dd__get_cone_xform(a, rot, radius_b, height);
 
   dd_vertex_t *start_ptr_1 = ctx->verts_data + ctx->verts_len;
-  dd__arc(ctx, &pt_bottom, 1.0f, (float)DBGDRAW_TWO_PI, resolution, 0);
+  dd__arc(ctx, &pt_bottom, 1.0f, (float)DBGDRAW_TWO_PI, resolution, 1);
   dd_vertex_t *end_ptr_1 = ctx->verts_data + ctx->verts_len;
   dd__transform_verts(xform_a, start_ptr_1, end_ptr_1, 0);
 
@@ -1880,7 +1881,7 @@ void dd__conical_frustum(dd_ctx_t *ctx, dd_vec3_t a, dd_vec3_t b, float radius_a
   }
 
   dd_vertex_t *start_ptr_2 = ctx->verts_data + ctx->verts_len;
-  dd__arc(ctx, &pt_top, 1.0f, (float)DBGDRAW_TWO_PI, resolution, 1);
+  dd__arc(ctx, &pt_top, 1.0f, (float)DBGDRAW_TWO_PI, resolution, 0);
   dd_vertex_t *end_ptr_2 = ctx->verts_data + ctx->verts_len;
   dd__transform_verts(xform_b, start_ptr_2, end_ptr_2, 0);
 
@@ -2536,18 +2537,17 @@ dd_aabb(dd_ctx_t *ctx, float *a, float *b)
   DBGDRAW_HANDLE_OUT_OF_MEMORY(ctx->verts_data, ctx->verts_len + new_verts, ctx->verts_cap, sizeof(dd_vertex_t));
 
   dd_vec3_t pts[8] =
-      {
-          dd_vec3(a[0], a[1], a[2]),
-          dd_vec3(b[0], a[1], a[2]),
-          dd_vec3(b[0], a[1], b[2]),
-          dd_vec3(a[0], a[1], b[2]),
+  {
+    dd_vec3(a[0], a[1], a[2]),
+    dd_vec3(b[0], a[1], a[2]),
+    dd_vec3(b[0], a[1], b[2]),
+    dd_vec3(a[0], a[1], b[2]),
 
-          dd_vec3(b[0], b[1], a[2]),
-          dd_vec3(a[0], b[1], a[2]),
-          dd_vec3(a[0], b[1], b[2]),
-          dd_vec3(b[0], b[1], b[2]),
-
-      };
+    dd_vec3(b[0], b[1], a[2]),
+    dd_vec3(a[0], b[1], a[2]),
+    dd_vec3(a[0], b[1], b[2]),
+    dd_vec3(b[0], b[1], b[2]),
+  };
 
   dd__box(ctx, pts);
 
@@ -2584,18 +2584,17 @@ dd_obb(dd_ctx_t *ctx, float *c, float *m)
   dd_vec3_t v3 = axes.col[2];
 
   dd_vec3_t pts[8] =
-      {
-          dd_vec3(center_pt.x + v1.x - v2.x + v3.x, center_pt.y + v1.y - v2.y + v3.y, center_pt.z + v1.z - v2.z + v3.z),
-          dd_vec3(center_pt.x - v1.x - v2.x + v3.x, center_pt.y - v1.y - v2.y + v3.y, center_pt.z - v1.z - v2.z + v3.z),
-          dd_vec3(center_pt.x - v1.x - v2.x - v3.x, center_pt.y - v1.y - v2.y - v3.y, center_pt.z - v1.z - v2.z - v3.z),
-          dd_vec3(center_pt.x + v1.x - v2.x - v3.x, center_pt.y + v1.y - v2.y - v3.y, center_pt.z + v1.z - v2.z - v3.z),
+  {
+    dd_vec3(center_pt.x + v1.x - v2.x + v3.x, center_pt.y + v1.y - v2.y + v3.y, center_pt.z + v1.z - v2.z + v3.z),
+    dd_vec3(center_pt.x - v1.x - v2.x + v3.x, center_pt.y - v1.y - v2.y + v3.y, center_pt.z - v1.z - v2.z + v3.z),
+    dd_vec3(center_pt.x - v1.x - v2.x - v3.x, center_pt.y - v1.y - v2.y - v3.y, center_pt.z - v1.z - v2.z - v3.z),
+    dd_vec3(center_pt.x + v1.x - v2.x - v3.x, center_pt.y + v1.y - v2.y - v3.y, center_pt.z + v1.z - v2.z - v3.z),
 
-          dd_vec3(center_pt.x - v1.x + v2.x + v3.x, center_pt.y - v1.y + v2.y + v3.y, center_pt.z - v1.z + v2.z + v3.z),
-          dd_vec3(center_pt.x + v1.x + v2.x + v3.x, center_pt.y + v1.y + v2.y + v3.y, center_pt.z + v1.z + v2.z + v3.z),
-          dd_vec3(center_pt.x + v1.x + v2.x - v3.x, center_pt.y + v1.y + v2.y - v3.y, center_pt.z + v1.z + v2.z - v3.z),
-          dd_vec3(center_pt.x - v1.x + v2.x - v3.x, center_pt.y - v1.y + v2.y - v3.y, center_pt.z - v1.z + v2.z - v3.z),
-
-      };
+    dd_vec3(center_pt.x - v1.x + v2.x + v3.x, center_pt.y - v1.y + v2.y + v3.y, center_pt.z - v1.z + v2.z + v3.z),
+    dd_vec3(center_pt.x + v1.x + v2.x + v3.x, center_pt.y + v1.y + v2.y + v3.y, center_pt.z + v1.z + v2.z + v3.z),
+    dd_vec3(center_pt.x + v1.x + v2.x - v3.x, center_pt.y + v1.y + v2.y - v3.y, center_pt.z + v1.z + v2.z - v3.z),
+    dd_vec3(center_pt.x - v1.x + v2.x - v3.x, center_pt.y - v1.y + v2.y - v3.y, center_pt.z - v1.z + v2.z - v3.z),
+  };
 
   dd__box(ctx, pts);
 

@@ -1,4 +1,5 @@
-// TODO: determine why this demo looks different between OGL and D3D
+// TODO(maciej): determine why this demo looks different between OGL and D3D - most likely polygon offset
+
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE
@@ -105,7 +106,7 @@ init(app_state_t* state)
 
   state->camera = calloc( 1, sizeof(msh_camera_t) );
   msh_camera_init( state->camera, &(msh_camera_desc_t)
-                  { .eye = msh_vec3( -6.0f, 2.5f, -6.0f ),
+                  { .eye = msh_vec3( 6.0f, 2.5f, 6.0f ),
                     .center = msh_vec3_zeros(),
                     .up = msh_vec3_posy(),
                     .viewport = msh_vec4( 0.0f, 0.0f, (float)d3d11_desc.win_w, (float)d3d11_desc.win_h),

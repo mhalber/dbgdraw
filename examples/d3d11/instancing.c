@@ -70,7 +70,7 @@ init(app_state_t* state)
   
   d3d11_ctx_desc_t d3d11_desc = 
   {
-    .win_title = "dbgdraw_d3d11_basic",
+    .win_title = "dbgdraw_d3d11_instancing",
     .win_x = 100,
     .win_y = 100,
     .win_w = 640,

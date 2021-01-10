@@ -115,8 +115,8 @@ void frame(app_state_t* state)
   float fovy = 1.0472f; /* approx. 60 deg in radians */
   
   static float angle = 0.0f;
-  if (angle > DBGDRAW_TWO_PI) { angle -= (float)DBGDRAW_TWO_PI; }
-  angle += 0.02f;
+  // if (angle > DBGDRAW_TWO_PI) { angle -= (float)DBGDRAW_TWO_PI; }
+  // angle += 0.02f;
   
   msh_vec3_t cam_pos = msh_vec3(0.8f, 2.6f, 3.0f);
   msh_mat4_t view = msh_look_at(cam_pos, msh_vec3_zeros(), msh_vec3_posy());
@@ -133,9 +133,9 @@ void frame(app_state_t* state)
     .projection_type   = DBGDRAW_PERSPECTIVE };
   dd_new_frame(dd_ctx, &info);
   
-  msh_vec3_t x0 = msh_vec3_negx(); msh_vec3_t x1 = msh_vec3_posx();
-  msh_vec3_t y0 = msh_vec3_negy(); msh_vec3_t y1 = msh_vec3_posy();
-  msh_vec3_t z0 = msh_vec3_negz(); msh_vec3_t z1 = msh_vec3_posz();
+  msh_vec3_t x0 = msh_vec3_zeros(); msh_vec3_t x1 = msh_vec3_posx();
+  msh_vec3_t y0 = msh_vec3_zeros(); msh_vec3_t y1 = msh_vec3_posy();
+  msh_vec3_t z0 = msh_vec3_zeros(); msh_vec3_t z1 = msh_vec3_posz();
   
   dd_set_primitive_size(dd_ctx, 1.0f);
   dd_set_transform(dd_ctx, model.data);
@@ -150,6 +150,10 @@ void frame(app_state_t* state)
   dd_line(dd_ctx, z0.data, z1.data);
   dd_set_color(dd_ctx, DBGDRAW_GRAY);
   dd_aabb(dd_ctx, msh_vec3(-1.1f, -1.1f, -1.1f).data, msh_vec3(1.1f, 1.1f, 1.1f).data);
+  dd_end_cmd(dd_ctx);
+
+  dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
+  dd_circle(dd_ctx, x0.data, 1.0f);
   dd_end_cmd(dd_ctx);
 
   dd_render(dd_ctx);
