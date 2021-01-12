@@ -1,5 +1,3 @@
-//TODO(maciej): Figure out issue with the coordinate system / ortho matrix / whatever is the cause for the circles not rendering correctly
-
 #define MSH_STD_INCLUDE_LIBC_HEADERS
 #define MSH_STD_IMPLEMENTATION
 #define MSH_VEC_MATH_IMPLEMENTATION

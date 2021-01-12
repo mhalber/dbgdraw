@@ -1,5 +1,3 @@
-// TODO(maciej): determine why this demo looks different between OGL and D3D - most likely polygon offset
-
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE

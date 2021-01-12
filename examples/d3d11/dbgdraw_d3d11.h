@@ -3,8 +3,6 @@
 
 #define DBGDRAW_D3D11_MAX_FONTS 16
 
-// TODO(maciej): Ensure proper polygon offset that mirrors OGL implementation
-
 typedef struct dd_render_backend
 {
   const d3d11_ctx_t* d3d11;
@@ -17,7 +15,8 @@ typedef struct dd_render_backend
   ID3D11Buffer* instance_buffer;
   ID3D11ShaderResourceView* instance_buffer_view;
 
-  ID3D11RasterizerState* rasterizer_state;
+  ID3D11RasterizerState* point_line_rasterizer_state;
+  ID3D11RasterizerState* fill_rasterizer_state;
   ID3D11DepthStencilState* depth_stencil_state;
   ID3D11BlendState* blend_state;
 
@@ -212,7 +211,11 @@ dd_backend_init( dd_ctx_t* ctx )
     .FillMode = D3D11_FILL_SOLID,
     .CullMode = D3D11_CULL_BACK
   };
-  hr = ID3D11Device_CreateRasterizerState( d3d11->device, &rasterizer_state_desc, &backend->rasterizer_state );
+  hr = ID3D11Device_CreateRasterizerState( d3d11->device, &rasterizer_state_desc, &backend->point_line_rasterizer_state );
+  assert(SUCCEEDED(hr));
+  rasterizer_state_desc.DepthBias = 1;
+  rasterizer_state_desc.SlopeScaledDepthBias = 1;
+  hr = ID3D11Device_CreateRasterizerState( d3d11->device, &rasterizer_state_desc, &backend->fill_rasterizer_state );
   assert(SUCCEEDED(hr));
 
   // Setup depth-stencil state
@@ -258,7 +261,8 @@ int32_t dd_backend_term(dd_ctx_t* ctx)
   ID3D11Buffer_Release( backend->instance_buffer );
   ID3D11ShaderResourceView_Release( backend->instance_buffer_view );
 
-  ID3D11RasterizerState_Release( backend->rasterizer_state );
+  ID3D11RasterizerState_Release( backend->point_line_rasterizer_state );
+  ID3D11RasterizerState_Release( backend->fill_rasterizer_state );
   ID3D11DepthStencilState_Release( backend->depth_stencil_state );
   ID3D11BlendState_Release( backend->blend_state );
   
@@ -314,7 +318,6 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
   FLOAT blend_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
   ID3D11DeviceContext_OMSetDepthStencilState( d3d11->device_context, backend->depth_stencil_state, 0 );
   ID3D11DeviceContext_OMSetBlendState( d3d11->device_context, backend->blend_state, blend_color, 0xFFFFFFFF );
-  ID3D11DeviceContext_RSSetState( d3d11->device_context, backend->rasterizer_state );
   
   static D3D_PRIMITIVE_TOPOLOGY topology_modes[3];
   topology_modes[DBGDRAW_MODE_FILL]   = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -331,6 +334,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
   {
     dd_cmd_t* cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul( ctx->proj, dd_mat4_mul( ctx->view, cmd->xform ) );
+    dd_mat4_t normal_matrix = dd_mat4_mul( ctx->proj, dd_mat4_mul( ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform)) ));
     int num_buffers = 1;
     if (cmd->instance_count && cmd->instance_data )
     {
@@ -358,7 +362,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     dd_cb_data_t cb_data = 
     { 
       .mvp = mvp, 
-      .normal_matrix = mvp,  // TODO(maciej): Make this actual normal matrix
+      .normal_matrix = normal_matrix,
       .viewport = ctx->viewport,
       .aa_radius = ctx->aa_radius,
       .shading_type = (uint32_t)cmd->shading_type, 
@@ -376,6 +380,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
 
     if (cmd->draw_mode == DBGDRAW_MODE_FILL )
     {
+      ID3D11DeviceContext_RSSetState( d3d11->device_context, backend->fill_rasterizer_state );
       ID3D11Buffer* buffers[] = { backend->vertex_buffer, backend->instance_buffer };
 
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, backend->base_input_layout);  
@@ -407,6 +412,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
     }
     else
     {
+      ID3D11DeviceContext_RSSetState( d3d11->device_context, backend->point_line_rasterizer_state );
       ID3D11ShaderResourceView* buffer_views[] = {backend->vertex_buffer_view, backend->instance_buffer_view};
       ID3D11DeviceContext_IASetPrimitiveTopology(d3d11->device_context, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
       ID3D11DeviceContext_IASetInputLayout(d3d11->device_context, null_layout);  
@@ -686,7 +692,7 @@ dd__init_point_shader_source( const char** shdr_src )
       float2 offset = offsets[vertex_idx%3];
 
       float4 clip_pos = mul(mvp, float4(v.pos, 1.0f));
-      clip_pos.z -= 0.0001; // Bit of a hack
+      // clip_pos.z -= 0.0001; // Bit of a hack
       float2 ndc_pos = clip_pos.xy / clip_pos.w;
       float2 viewport_pos = float2(ndc_pos.x*width, ndc_pos.y*height);
       viewport_pos += offset;
@@ -879,6 +885,7 @@ dd__init_point_shader_source( const char** shdr_src )
       output.line_info.x = lerp(line_width_a, line_width_b, quad_info.x);
       output.line_info.y = 0.5 * line_length;
       output.uv = float2( quad_info.y * output.line_info.x, (2.0 * quad_info.x - 1.0) * output.line_info.y);
+      // output.pos.z -= 0.00005; // Bit of a hack
       return output;
     }
 

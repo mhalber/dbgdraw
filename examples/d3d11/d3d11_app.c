@@ -1,8 +1,5 @@
 /* This file is modelled after the d3d11entry.c from sokol_gfx, by Andre Weissflog (@floooh)*/
 
-
-// TODO(maciej): Fix mouse controls.
-
 #define WIN32_LEAN_AND_MEAN
 #define D3D11_NO_HELPERS
 #define CINTERFACE

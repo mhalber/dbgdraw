@@ -250,6 +250,7 @@ dd_backend_render(dd_ctx_t *ctx)
   {
     dd_cmd_t *cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, cmd->xform));
+    dd_mat4_t normal_matrix = dd_mat4_mul( ctx->proj, dd_mat4_mul( ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform)) ));
 
     if (cmd->instance_count && cmd->instance_data)
     {
@@ -291,6 +292,7 @@ dd_backend_render(dd_ctx_t *ctx)
     {
       GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
+      GLCHECK(glUniformMatrix4fv(6, 1, GL_FALSE, normal_matrix.data));
       GLCHECK(glUniform1i(1, 0));
       GLCHECK(glUniform1i(2, (int)(cmd->instance_count>0) ));
 
@@ -395,6 +397,7 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
       layout(location = 0) uniform mat4 u_mvp;
       layout(location = 1) uniform int shading_type;
       layout(location = 2) uniform bool instancing_enabled;
+      layout(location = 6) uniform mat4 u_normal_matrix;
 
       layout(location = 0) in vec4 in_position_and_size;
       layout(location = 1) in vec3 in_uv_or_normal;
@@ -415,8 +418,7 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
         }
         else
         {
-          // TODO(maciej): Normal matrix
-          v_uv_or_normal = vec3(u_mvp * vec4(in_uv_or_normal, 0.0));
+          v_uv_or_normal = vec3(u_normal_matrix * vec4(in_uv_or_normal, 0.0));
         }
         v_shading_type = shading_type;
         if (instancing_enabled) { gl_Position = u_mvp * vec4(in_position_and_size.xyz + in_instance_pos, 1.0); }
