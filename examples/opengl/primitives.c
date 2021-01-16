@@ -295,25 +295,27 @@ frame( app_state_t* state )
     switch( draw_mode )
     {
       case DBGDRAW_MODE_POINT:
-      if( !show_points ) { continue; }
-      dd_set_primitive_size( primitives, 5.0f );
-      color = state->colors + 6;
-      break;
+        if( !show_points ) { continue; }
+        dd_set_primitive_size( primitives, 5.0f );
+        color = state->colors + 6;
+        break;
       case DBGDRAW_MODE_STROKE:
-      if( !show_lines) { continue; }
-      dd_set_primitive_size( primitives, 3.0f );
-      color = state->colors + 3;
-      break;
+        if( !show_lines) { continue; }
+        dd_set_primitive_size( primitives, 3.0f );
+        color = state->colors + 3;
+        break;
       case DBGDRAW_MODE_FILL:
-      if( !show_solid ) { continue; }
-      color = state->colors;
-      break;
+        if( !show_solid ) { continue; }
+        color = state->colors;
+        break;
     }
     
     dd_begin_cmd( primitives, draw_mode );
     cur_loc = msh_vec3( 3, 0, 0 );
     dd_set_color( primitives, *color );
-    dd_aabb( primitives, msh_vec3_add(cur_loc, min_pt).data, msh_vec3_add(cur_loc, max_pt).data );
+    msh_vec3_t v0 = msh_vec3_add(cur_loc, min_pt);
+    msh_vec3_t v1 = msh_vec3_add(cur_loc, max_pt);
+    dd_aabb( primitives, v0.data, v1.data );
     
     cur_loc = msh_vec3( 1, 0, 0 );
     dd_set_color( primitives, *color );
@@ -334,44 +336,42 @@ frame( app_state_t* state )
     
     cur_loc = msh_vec3( -3, 0, 0 );
     dd_set_color( primitives, *color );
-    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3(  -0.5,  -0.5, 0.0 ) ).data,
-                         msh_vec3_add(cur_loc, msh_vec3(  0.5,  -0.5, 0.0 ) ).data,
-                         msh_vec3_add(cur_loc, msh_vec3(  0.5, 0.5, 0.0 ) ).data,
-                         msh_vec3_add(cur_loc, msh_vec3(  -0.5, 0.5, 0.0 ) ).data );
-    color++;
-    
-    cur_loc = msh_vec3( 3, 0, -2 );
-    dd_set_color( primitives, *color );
-    dd_circle( primitives, cur_loc.data, 0.5f );
-    
-    
-    cur_loc = msh_vec3( 1, 0, -2 );
-    dd_set_color( primitives, *color );
-    dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI*0.8 );
-    
-    cur_loc = msh_vec3( -1, 0, -2 );
-    dd_set_color( primitives, *color );
-    dd_sphere( primitives, cur_loc.data, 0.5f );
-
-
-    cur_loc = msh_vec3( -3, 0, -2 );
-    dd_set_color( primitives, *color );
-    dd_torus( primitives, cur_loc.data, 0.5f, 0.1f );
+    dd_quad( primitives, msh_vec3_add(cur_loc, msh_vec3( -0.5, -0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5, -0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3(  0.5,  0.5, 0.0 ) ).data,
+                         msh_vec3_add(cur_loc, msh_vec3( -0.5,  0.5, 0.0 ) ).data );
     color++;
     
     cur_loc = msh_vec3( 3, 0, 2 );
     dd_set_color( primitives, *color );
-    dd_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    dd_circle( primitives, cur_loc.data, 0.5f );
     
     cur_loc = msh_vec3( 1, 0, 2 );
     dd_set_color( primitives, *color );
-    dd_cone( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    dd_arc( primitives, cur_loc.data, 0.5f, (float)MSH_TWO_PI*0.8 );
     
     cur_loc = msh_vec3( -1, 0, 2 );
     dd_set_color( primitives, *color );
+    dd_sphere( primitives, cur_loc.data, 0.5f );
+
+    cur_loc = msh_vec3( -3, 0, 2 );
+    dd_set_color( primitives, *color );
+    dd_torus( primitives, cur_loc.data, 0.5f, 0.1f );
+    color++;
+    
+    cur_loc = msh_vec3( 3, 0, -2 );
+    dd_set_color( primitives, *color );
+    dd_cylinder( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    
+    cur_loc = msh_vec3( 1, 0, -2 );
+    dd_set_color( primitives, *color );
+    dd_cone( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f );
+    
+    cur_loc = msh_vec3( -1, 0, -2 );
+    dd_set_color( primitives, *color );
     dd_conical_frustum( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.5f, 0.25f );
     
-    cur_loc = msh_vec3( -3, 0, 2 );
+    cur_loc = msh_vec3( -3, 0, -2 );
     dd_set_color( primitives, *color );
     dd_arrow( primitives, msh_vec3_add(cur_loc, p0).data, msh_vec3_add(cur_loc, p1).data, 0.3f, 0.45f, 0.25f );
     
