@@ -879,13 +879,16 @@ dd__init_point_shader_source( const char** shdr_src )
       float2 viewport_pt = viewport_pos[2] + dir_x + dir_y;
       float2 ndc_pt = float2((viewport_pt.x - half_w) / half_w, (viewport_pt.y - half_h) / half_h);
 
+      float4 color = vertices[2 + quad_info.x].color;
+      color.a = min(vertices[2 + quad_info.x].size * color.a, 1.0f);
+
       vs_out output;
       output.pos = float4(ndc_pt * zw_part.y, zw_part);
-      output.color = vertices[2 + quad_info.x].color;
+      output.color = color;
       output.line_info.x = lerp(line_width_a, line_width_b, quad_info.x);
       output.line_info.y = 0.5 * line_length;
       output.uv = float2( quad_info.y * output.line_info.x, (2.0 * quad_info.x - 1.0) * output.line_info.y);
-      // output.pos.z -= 0.00005; // Bit of a hack
+
       return output;
     }
 

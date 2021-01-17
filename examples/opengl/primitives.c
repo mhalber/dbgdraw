@@ -172,7 +172,7 @@ init(app_state_t* state)
   }
     
   msh_camera_init(&state->camera, &(msh_camera_desc_t){ 
-                      .eye       = msh_vec3(-3.0f, 3.5f, -8.0f),
+                      .eye       = msh_vec3(3.0f, 3.5f, 8.0f),
                       .center    = msh_vec3_zeros(),
                       .up        = msh_vec3_posy(),
                       .viewport  = msh_vec4(0, 0, (float)win_width, (float)win_height),

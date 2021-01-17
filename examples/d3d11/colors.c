@@ -158,7 +158,7 @@ void frame(app_state_t* state)
   if (angle > DBGDRAW_TWO_PI) { angle -= (float)DBGDRAW_TWO_PI; }
   angle += 0.02f;
   
-  msh_vec3_t cam_pos = msh_vec3(0, 0, 5);
+  msh_vec3_t cam_pos = msh_vec3(0.0f, 0.0f, 5.0f);
   msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
   msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
   msh_mat4_t proj = msh_ortho( 0.0f, (float)w, 0.0f, (float)h, 0.01f, 10.0f );

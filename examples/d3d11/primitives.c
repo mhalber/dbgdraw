@@ -194,8 +194,8 @@ void frame(app_state_t* state)
     msh_camera_update_proj( cam );
   }
   
-  static int32_t show_lines   = 1;
-  static int32_t show_solid   = 0;
+  static int32_t show_lines   = 0;
+  static int32_t show_solid   = 1;
   static int32_t show_points  = 0;
   static int32_t shading_mode = (int32_t)DBGDRAW_SHADING_NONE;
   static int32_t show_overlay = 1;

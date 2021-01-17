@@ -130,7 +130,7 @@ frame(app_state_t* state)
   int32_t w, h;
   glfwGetWindowSize( window, &w, &h );
     
-  msh_vec3_t cam_pos = msh_vec3(0, 0, 5);
+  msh_vec3_t cam_pos = msh_vec3(0.0f, 0.0f, 5.0f);
   msh_mat4_t view = msh_look_at( cam_pos, msh_vec3_zeros(), msh_vec3_posy() );
   msh_vec4_t viewport = msh_vec4( 0.0f, 0.0f, (float)w, (float)h );
   msh_mat4_t proj = msh_ortho( 0.0f, (float)w, 0.0f, (float)h, 0.01f, 10.0f );
@@ -150,8 +150,8 @@ frame(app_state_t* state)
   dd_set_primitive_size(dd_ctx, 12.0f);
 
   dd_begin_cmd(dd_ctx, DBGDRAW_MODE_FILL);
-  dd_circle2d(dd_ctx, (float[2]){0.0, 0.0}, 7.5 );
   dd_set_instance_data(dd_ctx, SIZE_X*SIZE_Y, &instance_data[0][0]);
+  dd_circle2d(dd_ctx, (float[2]){0.0, 0.0}, 7.5 );
   dd_end_cmd(dd_ctx);
     
   dd_render(dd_ctx);

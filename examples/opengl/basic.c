@@ -145,7 +145,6 @@ void frame(app_state_t* state)
   dd_set_primitive_size( dd_ctx, 1.0f );
   dd_set_transform( dd_ctx, model.data );
 
-  dd_set_primitive_size(dd_ctx, 1.0);
   dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
   dd_set_color( dd_ctx, DBGDRAW_RED );
   dd_line( dd_ctx, x0.data, x1.data );
@@ -157,8 +156,6 @@ void frame(app_state_t* state)
   dd_aabb( dd_ctx, msh_vec3( -1.1f, -1.1f, -1.1f ).data, msh_vec3( 1.1f, 1.1f, 1.1f ).data );
   dd_end_cmd( dd_ctx );
   
-
-
   dd_render( dd_ctx );
 }
 

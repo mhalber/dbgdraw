@@ -1605,6 +1605,7 @@ void dd__arc_fill(dd_ctx_t *ctx, dd_vec3_t *center, float radius, float theta, i
 
     if (flip)
     {
+      // printf("Flipping\n");
       if (ctx->cur_cmd->shading_type)
       {
         dd__triangle_normal(ctx, center, &pt_b, &pt_a, &normal);
@@ -2422,7 +2423,7 @@ dd__circle_ex(dd_ctx_t *ctx, float *center, float radius, uint8_t is_3d)
   DBGDRAW_HANDLE_OUT_OF_MEMORY(ctx->verts_data, ctx->verts_len + new_verts, ctx->verts_cap, sizeof(dd_vertex_t));
 
   dd_vec3_t center_pt = dd_vec3(center[0], center[1], is_3d ? center[2] : 0.0f);
-  dd__arc(ctx, &center_pt, radius, (float)DBGDRAW_TWO_PI, resolution, 0);
+  dd__arc(ctx, &center_pt, radius, (float)DBGDRAW_TWO_PI, resolution, !is_3d);
 
   return DBGDRAW_ERR_OK;
 }
