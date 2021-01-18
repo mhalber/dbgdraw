@@ -765,7 +765,7 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
 #if DBGDRAW_HAS_TEXT_SUPPORT
   ctx->fonts_len = 0;
   ctx->fonts_cap = DD_MAX(8, desc->max_fonts);
-  ctx->fonts = malloc(ctx->fonts_cap * sizeof(dd_font_data_t));
+  ctx->fonts = DBGDRAW_MALLOC(ctx->fonts_cap * sizeof(dd_font_data_t));
   if (!ctx->fonts)
   {
     return DBGDRAW_ERR_FAILED_ALLOC;

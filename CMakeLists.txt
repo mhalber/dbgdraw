@@ -14,7 +14,7 @@ if (MSVC)
   set( CMAKE_C_FLAGS "/FC /GR- /EHa- /nologo /W4 /wd4115 /wd4201 /wd4204 /wd4996 /wd4221" )
 endif()
 
-if (${BACKEND} STREQUAL "OGL33")
+if (${DBGDRAW_BACKEND} STREQUAL "OGL33")
 
   message("-- Selected OGL33 backend!")
 
@@ -31,7 +31,7 @@ if (${BACKEND} STREQUAL "OGL33")
   include_directories( ${SRC_DIR} ${GLFW3_INCLUDE_DIR} )
   add_definitions(-DDD_USE_OGL_33)
 
-elseif (${BACKEND} STREQUAL "OGL45")
+elseif (${DBGDRAW_BACKEND} STREQUAL "OGL45")
 
   message("-- Selected OGL45 backend!")
 
@@ -48,7 +48,7 @@ elseif (${BACKEND} STREQUAL "OGL45")
   include_directories( ${SRC_DIR} ${GLFW3_INCLUDE_DIR} )
   add_definitions(-DDD_USE_OGL_45)
 
-elseif (${BACKEND} STREQUAL "D3D11")
+elseif (${DBGDRAW_BACKEND} STREQUAL "D3D11")
 
   message("-- Selected D3D11 backend!")
 

@@ -1,22 +1,20 @@
-### Work in progress
+# dbgdraw
 
-## dbgdraw
-
-dbgdraw is intended to be a small immediate mode library for putting simple graphics on the screen. Below you can see some examples of what can be achieved in dbgdraw.
+dbgdraw is a small immediate mode library for putting simple graphics on the screen. Below you can see some examples of what can be achieved in dbgdraw.
 
 ![Overview](images/overview.png)
 
-### Features
+## Features
 
 - Written in C99 with minimal dependencies (c stdlib, stb_truetype.h [optional] )
-- Validation - user can enable API validation checks 
+- Validation - user can enable API validation checks
+- OpenGL 3.3, OpenGL 4.5 and Direct3D 11 backends
 
-### Current issues
+## Limitations
 
 - No full UTF-8 support, just Latin + Greek character ranges
-- Only openGL backends at this point, for OpenGL3.3 and OpenGL4.5
 
-### Usage
+## Usage
 
 To start drawing, one needs to initialize the *dbgdraw* context using `dd_init` function. Then on each frame, some information needs to be provided to *dbgdraw* regarding the application state, like the camera position and viewport size. This can be achieved using the `dd_new_frame` call. Similarly, at the end of the frame, the user requests the content to be rendered using `dd_render`. Once the application is finished, or context is no longer needed, it can be removed using `dd_term`.
 
@@ -79,8 +77,8 @@ dd_render( dd_ctx );
 
 Note, that all of the `dd_<xyz>` calls take a pointer to float data, so they should be agnostic to any vector library that you might use! (Except for dbgdraw expecting column-major matrices)
 
-#### Memory
-dbgdraw maintains two memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init(...)`. If the user ever submits more commands/vertices than the amount specified at the initialization time, the memory will be automatically resized. This is done similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled. 
+### Memory
+dbgdraw maintains two memory buffers - the command buffer and the vertex buffer. Their initial size is specified in a call to `dd_init(...)`. If the user ever submits more commands/vertices than the amount specified at the initialization time, the memory will be automatically resized. This is done similarly to how it is performed in C++'s '`std::vector`, where the capacity of these buffers will be doubled if the container runs out of space. 
 
 By default memory allocations are done with `malloc`, `free`, and `realloc`. These defaults can be changed by defining the following macros, before including 'dbgdraw.h': `DBGDRAW_MALLOC(size)`, `DBGDRAW_FREE(ptr)`, `DBGDRAW_REALLOC(ptr, size)`. This way the user can use their own allocators.
 
@@ -95,16 +93,31 @@ Additionally, there is a macro that controls out-of-memory behavior. By redefini
     }                                                             \
   } while (0)
 ~~~
-The above code will cause all function that fill-in the buffer to exit early with out of memory error that the client-side might choose to deal with in whichever way they choose.
+The above code will cause all function that fill-in the buffer to exit early with out of memory error that the client-side might deal with in whichever way they choose.
 
-#### Building
+### Building
 
 To use dbgdraw you can simply drop the `dbgdraw.h` into your application source tree and add `#define DBGDRAW_IMPLEMENTATION` and `#include "dbgdraw.h"`. Optionally, there is also `dbgdraw.c` that you can add to your build if you wish to avoid the recompilation of the dbgdraw library each time.
 
-To build the examples you can use CMake, by simply
-~~
+To build the examples you can use CMake. 
+~~~
 mkdir build
 cd build
-cmake .. -G "<your favourite generator>"
-<build using your preferred method, make, nmake, Visual Studio, etc.>
-~~
+cmake .. -G "<your favourite generator>" -DDBGDRAW_BACKEND=<backend keyword> -DCMAKE_BUILD_TYPE=<Release, Debug, etc.>
+<build using your selected generator>
+~~~
+
+Currently available backends and their keywords
+ - OpenGL 3.3 - OGL33
+ - OpenGL 4.5 - OGL45
+ - Direct3D 11 - D3D11
+
+For example, building the examples on Windows, using Direct3D11 backend, using NMake, in Release mode:
+~~~
+mkdir build
+cd build
+cmake .. -G "NMake Makefiles" -DDBGDRAW_BACKEND=D3D11 -DCMAKE_BUILD_TYPE=Release
+<build using your selected generator>
+~~~
+
+Note, that for building examples with OpenGL backend you will need GLFW library. The D3D examples use Windows API for windowing, and hence do not have any extra requirements. 
