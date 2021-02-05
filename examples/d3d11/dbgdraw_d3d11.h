@@ -192,7 +192,8 @@ dd_backend_init( dd_ctx_t* ctx )
                                    ((ctx->instance_cap * sizeof(dd_instance_data_t)) / 4), 
                                    D3D11_BIND_VERTEX_BUFFER );
 
-  // Setup sampler    
+  // Setup font sampler    
+#if DBGDRAW_HAS_TEXT_SUPPORT
   D3D11_SAMPLER_DESC sampler_desc = 
   {
     .Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR,
@@ -203,6 +204,7 @@ dd_backend_init( dd_ctx_t* ctx )
   };
   hr = ID3D11Device_CreateSamplerState(d3d11->device, &sampler_desc, &backend->font_texture_sampler);
   assert(SUCCEEDED(hr));
+#endif
 
   // Setup rasterizer state
   D3D11_RASTERIZER_DESC rasterizer_state_desc = 
@@ -454,11 +456,11 @@ dd__d3d11_compile_shader(const char* src, const char* target, const char* main)
   return output;
 }
 
+
+#if DBGDRAW_HAS_TEXT_SUPPORT
 int32_t
 dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height, uint32_t *tex_id)
 {
-#if DBGDRAW_HAS_TEXT_SUPPORT
-
   // TODO(maciej): Change into error?
   assert(ctx->fonts_cap <= DBGDRAW_D3D11_MAX_FONTS);
 
@@ -491,10 +493,10 @@ dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, 
   assert(SUCCEEDED(hr));
   hr = ID3D11Device_CreateShaderResourceView(d3d11->device, (ID3D11Resource*)backend->font_textures[cur_idx], NULL, &(backend->font_textures_views[cur_idx]));
   assert(SUCCEEDED(hr));
-#endif
 
   return DBGDRAW_ERR_OK;
 }
+#endif
 
 #define DBGDRAW_D3D11_STRINGIFY(x) #x
 #define DBDDRAW_D3D11_SHADER_HEADER "#pragma enable_d3d11_debug_symbols\n"
@@ -934,5 +936,6 @@ dd__init_point_shader_source( const char** shdr_src )
 }
 
 #undef DBGDRAW_D3D11_STRINGIFY
+#undef DBDDRAW_D3D11_SHADER_HEADER
 
 #endif /* DBGDRAW_D3D11_H */
