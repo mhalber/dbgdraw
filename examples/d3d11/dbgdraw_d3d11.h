@@ -53,8 +53,7 @@ typedef struct dd_base_cb_data
 ID3DBlob* dd__d3d11_compile_shader( const char* source, const char* target, const char* main );
 
 void dd__init_fill_shader_source( const char **shdr_src );
-void dd__init_stroke_shader_source( const char **shdr_src );
-void dd__init_point_shader_source( const char **shdr_src );
+void dd__init_point_and_stroke_shader_source( const char **shdr_src );
 
 void 
 dd__d3d11_create_dynamic_buffer( ID3D11Device* device, ID3D11Buffer** buffer, ID3D11ShaderResourceView** buffer_srv,
@@ -102,7 +101,7 @@ dd_backend_init( dd_ctx_t* ctx )
   const char* fill_shd_src = NULL;
   const char* point_shd_src = NULL;
   dd__init_fill_shader_source( &fill_shd_src );
-  dd__init_point_shader_source( &point_shd_src );
+  dd__init_point_and_stroke_shader_source( &point_shd_src );
 
   // Compile fill vertex shader
   ID3D10Blob* fill_vs_binary = dd__d3d11_compile_shader( fill_shd_src, "vs_5_0", "vs_main" );
@@ -366,7 +365,7 @@ int32_t dd_backend_render(dd_ctx_t* ctx)
       .mvp = mvp, 
       .normal_matrix = normal_matrix,
       .viewport = ctx->viewport,
-      .aa_radius = ctx->aa_radius,
+      .aa_radius = cmd->aa_radius,
       .shading_type = (uint32_t)cmd->shading_type, 
       .base_index = (uint32_t)cmd->base_index,
       .vertex_count = (uint32_t)cmd->vertex_count,
@@ -573,7 +572,7 @@ dd__init_fill_shader_source( const char** shdr_src )
 }
 
 void
-dd__init_point_shader_source( const char** shdr_src )
+dd__init_point_and_stroke_shader_source( const char** shdr_src )
 {
   *shdr_src = 
     // DBDDRAW_D3D11_SHADER_HEADER
@@ -688,9 +687,10 @@ dd__init_point_shader_source( const char** shdr_src )
       }
 
       float2 offsets[3];
-      offsets[0] = float2(-v.size, -v.size);
-      offsets[1] = float2( 3*v.size, -v.size);
-      offsets[2] = float2(-v.size,  3*v.size);
+      float size = v.size + aa_radius.x;
+      offsets[0] = float2(-size, -size);
+      offsets[1] = float2( 3*size, -size);
+      offsets[2] = float2(-size,  3*size);
       float2 offset = offsets[vertex_idx%3];
 
       float4 clip_pos = mul(mvp, float4(v.pos, 1.0f));
@@ -703,8 +703,8 @@ dd__init_point_shader_source( const char** shdr_src )
       vs_out output;
       output.pos = float4( ndc_pos.xy*clip_pos.w, clip_pos.zw );
       output.color = v.color;
-      output.uv = (offset / v.size);
-      output.line_info = float2(0.0, 0.0);// Ununsed
+      output.uv = offset;
+      output.line_info = float2(v.size, 0.0);// hijack first element for size
       return output;
     }
 
@@ -910,8 +910,14 @@ dd__init_point_shader_source( const char** shdr_src )
       if (is_point_rendering > 0)
       {
         float radius = length(input.uv);
-        if ( radius > 1.0 ) discard;
-        return input.color;
+        float size = input.line_info.x + aa_radius.x;
+        if ( radius > size ) discard;
+        float alpha = input.color.a;
+        if (aa_radius.x > 0.0001) 
+        {
+          alpha *= (1.0 - smoothstep( 1.0 - (aa_radius.x/size) , 1.0, radius/size ));
+        }
+        return float4( input.color.rgb, alpha );
       }
       else
       {

@@ -95,7 +95,7 @@ init( app_state_t* state ) {
   { 
     .max_vertices = 1024*200,
     .max_commands = 8,
-    .line_antialias_radius = 2.0f
+    .antialias_radius = 2.0f
   };
   error = dd_init( state->dd_ctx, &desc );
   error = dd_init_font_from_file( state->dd_ctx, "examples/fonts/cmunrm.ttf", "CMU", 32, 512, 512, &CMU_FONT );
@@ -328,7 +328,6 @@ void frame(app_state_t* state)
   if( bezier_pts_len > 1 ) idx = bezier_pts_len - 1;
   bezier_pts[ idx ] = quartic_interpolation_pts( control_pts[0], control_pts[1], control_pts[2], control_pts[3], control_pts[4], t );
   
-  dd_set_fill_type(dd_ctx, DBGDRAW_FILL_FLAT);
   float r = 2.0f;
   draw_line_segments( dd_ctx, bezier_pts, bezier_pts_len, DBGDRAW_LIGHT_PURPLE, r * 2.0f );
   

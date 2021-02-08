@@ -92,7 +92,7 @@ init(app_state_t* state)
     .enable_frustum_cull = false,
     .enable_depth_test = true,
     .enable_default_font = false,
-    .line_antialias_radius = 2.0f
+    .antialias_radius = 2.0f
   };
   error = dd_init( &state->dd_ctx, &desc);
   if (error)

@@ -52,7 +52,7 @@
   CONFIGURATION
   ===============
   dbgdraw can be configured to match your needs. Below we 
-  memory -mallocs
+  memory - mallocs
   string - memset memcpy strncmp, strncpy strnlen
   asserts
   math
@@ -71,7 +71,7 @@
 
   FEATURES
   ================
-  - OpenGL 4.5 backend
+  - OpenGL 3.3, 4.5 and Direct3D 11 backends
   - Optional validation layers that will check if state of dd_ctx_t is properly modified.
   - POD function signatures - drawing functions expect just basic data passed as float*. You can use glm, Eigen, HMM or whatever
   else libary to do client side computation and simply pass the pointer to the data to dbgdraw 
@@ -86,6 +86,12 @@
 
   EXAMPLE PROGRAM
   =================
+
+
+  TODOs
+  =================
+  [ ] Finish readme
+  [ ] Improve gradients - currently they are implemented using vertex colors which is less than ideal
 
 */
 
@@ -263,12 +269,11 @@ int32_t dd_end_cmd(dd_ctx_t *ctx);
 
 int32_t dd_set_transform(dd_ctx_t *ctx, float *xform);
 int32_t dd_set_shading_type(dd_ctx_t *ctx, dd_shading_t shading_type);
-int32_t dd_set_fill_type(dd_ctx_t *ctx, dd_fill_t fill_type);
 int32_t dd_set_color(dd_ctx_t *ctx, dd_color_t color);
-int32_t dd_set_gradient_a(dd_ctx_t *ctx, dd_color_t color, float *pos);
-int32_t dd_set_gradient_b(dd_ctx_t *ctx, dd_color_t color, float *pos);
 int32_t dd_set_detail_level(dd_ctx_t *ctx, uint8_t level);
 int32_t dd_set_primitive_size(dd_ctx_t *ctx, float primitive_size);
+int32_t dd_set_line_antialias_radius(dd_ctx_t *ctx, float amount_x, float amount_y);
+int32_t dd_set_antialias_radius(dd_ctx_t *ctx, float radius);
 
 // 3d drawing API
 int32_t dd_point(dd_ctx_t *ctx, float *pt_a);
@@ -540,7 +545,7 @@ typedef struct dd_context_desc
   int32_t max_instances;
   int32_t max_fonts;
   uint8_t detail_level;
-  float line_antialias_radius;
+  float antialias_radius;
   uint8_t enable_frustum_cull;
   uint8_t enable_depth_test;
 #if DBGDRAW_HAS_TEXT_SUPPORT && defined(DBGDRAW_USE_DEFAULT_FONT)
@@ -597,6 +602,7 @@ typedef struct dd_cmd_t
 
   dd_mode_t draw_mode;
   dd_shading_t shading_type;
+  dd_vec2_t aa_radius;
 #if DBGDRAW_HAS_TEXT_SUPPORT
   int32_t font_idx;
 #endif
@@ -757,7 +763,7 @@ dd_init(dd_ctx_t *ctx, dd_ctx_desc_t *desc)
   ctx->primitive_size = 2.0f;
   ctx->view = dd_mat4_identity();
   ctx->proj = dd_mat4_identity();
-  ctx->aa_radius = dd_vec2(desc->line_antialias_radius, 0.0f);
+  ctx->aa_radius = dd_vec2(desc->antialias_radius, 0.0f);
   ctx->enable_depth_test = desc->enable_depth_test;
 
   dd_backend_init(ctx);
@@ -962,6 +968,30 @@ dd_set_primitive_size(dd_ctx_t *ctx, float primitive_size)
 }
 
 int32_t
+dd_set_antialias_radius(dd_ctx_t *ctx, float radius)
+{
+  DBGDRAW_ASSERT(ctx);
+  ctx->aa_radius = dd_vec2(radius, radius);
+  if (ctx->cur_cmd)
+  {
+    ctx->cur_cmd->aa_radius = ctx->aa_radius;
+  }
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
+dd_set_line_antialias_radius(dd_ctx_t *ctx, float amount_x, float amount_y)
+{
+  DBGDRAW_ASSERT(ctx);
+  ctx->aa_radius = dd_vec2(amount_x, amount_y);
+  if (ctx->cur_cmd)
+  {
+    ctx->cur_cmd->aa_radius = ctx->aa_radius;
+  }
+  return DBGDRAW_ERR_OK;
+}
+
+int32_t
 dd_begin_cmd(dd_ctx_t *ctx, dd_mode_t draw_mode)
 {
   DBGDRAW_ASSERT(ctx);
@@ -976,6 +1006,7 @@ dd_begin_cmd(dd_ctx_t *ctx, dd_mode_t draw_mode)
   ctx->cur_cmd->base_index = ctx->verts_len;
   ctx->cur_cmd->draw_mode = draw_mode;
   ctx->cur_cmd->shading_type = ctx->shading_type;
+  ctx->cur_cmd->aa_radius = ctx->aa_radius;
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
   ctx->cur_cmd->font_idx = -1;
