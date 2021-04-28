@@ -867,8 +867,8 @@ dd__init_point_and_stroke_shader_source( const char** shdr_src )
 
       float extension_length = aa_radius.y;
       float line_length = line_vector_1_length + 2.0 * extension_length;
-      float line_width_a = max(vertices[2].size, 1.0) + aa_radius.x;
-      float line_width_b = max(vertices[3].size, 1.0) + aa_radius.x;
+      float line_width_a = max(vertices[2].size, 0.5) + aa_radius.x;
+      float line_width_b = max(vertices[3].size, 0.5) + aa_radius.x;
 
       float2 normal_a = 0.5 * line_width_a * mitter_0 / mitter_0_length;
       float2 normal_b = 0.5 * line_width_b * mitter_1 / mitter_1_length;
@@ -882,7 +882,7 @@ dd__init_point_and_stroke_shader_source( const char** shdr_src )
       float2 ndc_pt = float2((viewport_pt.x - half_w) / half_w, (viewport_pt.y - half_h) / half_h);
 
       float4 color = vertices[2 + quad_info.x].color;
-      color.a = min(vertices[2 + quad_info.x].size * color.a, 1.0f);
+      color.a = min(2*vertices[2 + quad_info.x].size * color.a, 1.0f);
 
       vs_out output;
       output.pos = float4(ndc_pt * zw_part.y, zw_part);

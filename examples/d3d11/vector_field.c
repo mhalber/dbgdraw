@@ -129,6 +129,7 @@ void frame(app_state_t* state)
   dd_new_frame( dd_ctx, &info );
   
   dd_ctx->aa_radius = dd_vec2( 2.0f, 2.0f );
+  dd_set_color(dd_ctx, DBGDRAW_BLACK);
   dd_begin_cmd( dd_ctx, DBGDRAW_MODE_STROKE );
   
   // Fill in the function data
@@ -158,7 +159,6 @@ void frame(app_state_t* state)
       pos_a[0] = base_x + (x-1) * delta_x;
       pos_a[1] = base_y + (y-1) * delta_y;
       
-      dd_set_color(dd_ctx, DBGDRAW_BLACK);
       float val_b = field_data[y][x-1];
       float val_c = field_data[y-1][x];
       float dx = val_b - val_a;

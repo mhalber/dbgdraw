@@ -42,7 +42,6 @@ typedef struct d3d11_app_input
   uint8_t keys[512];
   d3d11_app_mouse_t mouse;
   int32_t mods;
-
 } d3d11_app_input_t;
 
 typedef struct d3d11_ctx_desc
