@@ -195,10 +195,10 @@ dd_backend_init(dd_ctx_t *ctx)
 
   GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_pos_loc, 3, GL_FLOAT, GL_FALSE, offsetof(dd_instance_data_t, position)));
   GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_col_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(dd_instance_data_t, color)));
-  
+
   GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_pos_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_col_loc, bind_idx));
-  
+
   GLCHECK(glVertexArrayBindingDivisor(backend.vao, bind_idx, 1));
 
   return DBGDRAW_ERR_OK;
@@ -209,7 +209,7 @@ dd_backend_render(dd_ctx_t *ctx)
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t* backend = ctx->render_backend;
+  dd_render_backend_t *backend = ctx->render_backend;
 
   if (!ctx->commands_len)
   {
@@ -250,7 +250,7 @@ dd_backend_render(dd_ctx_t *ctx)
   {
     dd_cmd_t *cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, cmd->xform));
-    dd_mat4_t normal_matrix = dd_mat4_mul( ctx->proj, dd_mat4_mul( ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform)) ));
+    dd_mat4_t normal_matrix = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform))));
 
     if (cmd->instance_count && cmd->instance_data)
     {
@@ -268,7 +268,7 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniform1i(1, cmd->shading_type));
-      GLCHECK(glUniform1i(2, (cmd->instance_count>0) ));
+      GLCHECK(glUniform1i(2, (cmd->instance_count > 0)));
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
       if (cmd->font_idx >= 0)
@@ -284,7 +284,7 @@ dd_backend_render(dd_ctx_t *ctx)
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count ));
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count));
       }
     }
 
@@ -294,7 +294,7 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
       GLCHECK(glUniformMatrix4fv(6, 1, GL_FALSE, normal_matrix.data));
       GLCHECK(glUniform1i(1, 0));
-      GLCHECK(glUniform1i(2, (int)(cmd->instance_count>0) ));
+      GLCHECK(glUniform1i(2, (int)(cmd->instance_count > 0)));
 
       if (cmd->instance_count <= 0)
       {
@@ -302,7 +302,7 @@ dd_backend_render(dd_ctx_t *ctx)
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count ));
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count));
       }
     }
 
@@ -318,7 +318,7 @@ dd_backend_render(dd_ctx_t *ctx)
       GLCHECK(glUniform2fv(2, 1, ctx->aa_radius.data));
       GLCHECK(glUniform1i(3, 0));
       GLCHECK(glUniform2i(4, cmd->base_index, cmd->vertex_count));
-      GLCHECK(glUniform1i(5, (cmd->instance_count>0) ));
+      GLCHECK(glUniform1i(5, (cmd->instance_count > 0)));
 
       // For tex buffer lines vbo does not matter.
       if (cmd->instance_count <= 0)
@@ -327,7 +327,7 @@ dd_backend_render(dd_ctx_t *ctx)
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(GL_TRIANGLES, 0, 3 * cmd->vertex_count, cmd->instance_count ));
+        GLCHECK(glDrawArraysInstanced(GL_TRIANGLES, 0, 3 * cmd->vertex_count, cmd->instance_count));
       }
     }
   }
@@ -352,7 +352,7 @@ dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, 
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t* backend = ctx->render_backend;
+  dd_render_backend_t *backend = ctx->render_backend;
 
   GLCHECK(glCreateTextures(GL_TEXTURE_2D, 1, &backend->font_tex_ids[ctx->fonts_len]));
   GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_S, GL_REPEAT));
@@ -374,7 +374,7 @@ dd_backend_term(dd_ctx_t *ctx)
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t* backend = ctx->render_backend;
+  dd_render_backend_t *backend = ctx->render_backend;
 
   glDeleteVertexArrays(1, &backend->vao);
   glDeleteBuffers(1, &backend->vbo);
@@ -391,6 +391,7 @@ dd_backend_term(dd_ctx_t *ctx)
 
 void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
 {
+  // clang-format off
   *vert_shdr_src =
     DBGDRAW_SHADER_HEADER
     DBGDRAW_STRINGIFY(
@@ -412,13 +413,13 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
       void main() {
         if (instancing_enabled) { v_color = in_color + in_instance_col; }
         else                    { v_color = in_color; }
-        if (shading_type == 0)
+        if (shading_type == 1)
         {
-          v_uv_or_normal = in_uv_or_normal;
+          v_uv_or_normal = vec3(u_normal_matrix * vec4(in_uv_or_normal, 0.0));
         }
         else
         {
-          v_uv_or_normal = vec3(u_normal_matrix * vec4(in_uv_or_normal, 0.0));
+          v_uv_or_normal = in_uv_or_normal;
         }
         v_shading_type = shading_type;
         if (instancing_enabled) { gl_Position = u_mvp * vec4(in_position_and_size.xyz + in_instance_pos, 1.0); }
@@ -440,19 +441,25 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
       void main() {
         if (v_shading_type == 0)
         {
-          frag_color = vec4(v_color.rgb, min(1.0, v_color.a + texture(tex, vec2(v_uv_or_normal)).r));
+          frag_color = vec4(v_color.rgba);
         }
-        else
+        else if(v_shading_type == 1)
         {
           vec3 light_dir = vec3(0, 0, 1);
           float ndotl = dot(v_uv_or_normal, light_dir);
           frag_color = vec4(v_color.rgb * ndotl, v_color.a);
         }
+        else
+        {
+          frag_color = vec4(v_color.rgb, min(1.0, v_color.a + texture(tex, vec2(v_uv_or_normal)).r));
+        }
       });
+  // clang-format on
 }
 
 void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
 {
+  // clang-format off
   *vert_shdr_src =
     DBGDRAW_SHADER_HEADER
     DBGDRAW_STRINGIFY(
@@ -678,6 +685,7 @@ void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_
         frag_color = v_col;
         frag_color.a *= min(au, av);
       });
+  // clang-format on
 }
 
 #endif
