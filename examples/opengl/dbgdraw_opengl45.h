@@ -16,7 +16,8 @@ typedef struct dd_render_backend
   size_t ibo_size;
 } dd_render_backend_t;
 
-void dd__gl_check(const char *filename, uint32_t lineno)
+void
+dd__gl_check(const char* filename, uint32_t lineno)
 {
   uint32_t error = glGetError();
 
@@ -27,11 +28,10 @@ void dd__gl_check(const char *filename, uint32_t lineno)
   }
 }
 
-#define GLCHECK(x)                    \
-  do                                  \
-  {                                   \
-    x;                                \
-    dd__gl_check(__FILE__, __LINE__); \
+#define GLCHECK(x)                                                             \
+  do {                                                                         \
+    x;                                                                         \
+    dd__gl_check(__FILE__, __LINE__);                                          \
   } while (0)
 
 int8_t
@@ -43,7 +43,7 @@ dd__check_gl_program_status(GLuint program_id, bool report_error)
   {
     int32_t str_length = 0;
     glGetProgramiv(program_id, GL_INFO_LOG_LENGTH, &str_length);
-    GLchar *info_log = malloc(str_length);
+    GLchar* info_log = malloc(str_length);
     glGetProgramInfoLog(program_id, str_length, &str_length, info_log);
     fprintf(stderr, "[GL] Link error :\n%s\n", info_log);
     free(info_log);
@@ -61,7 +61,7 @@ dd__check_gl_shader_status(GLuint shader_id, bool report_error)
   {
     int32_t str_length = 0;
     glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &str_length);
-    GLchar *info_log = malloc(str_length);
+    GLchar* info_log = malloc(str_length);
     glGetShaderInfoLog(shader_id, str_length, &str_length, info_log);
     fprintf(stderr, "[GL] Compile error :\n%s\n", info_log);
     free(info_log);
@@ -71,36 +71,26 @@ dd__check_gl_shader_status(GLuint shader_id, bool report_error)
 }
 
 GLuint
-dd__gl_compile_shader_src(GLuint shader_type, const char *shader_src)
+dd__gl_compile_shader_src(GLuint shader_type, const char* shader_src)
 {
   const GLuint shader = glCreateShader(shader_type);
   glShaderSource(shader, 1, &shader_src, NULL);
   glCompileShader(shader);
   int32_t error = dd__check_gl_shader_status(shader, true);
-  if (error)
-  {
-    exit(-1);
-  }
+  if (error) { exit(-1); }
   return shader;
 }
 
 GLuint
-dd__gl_link_program(GLuint vertex_shader, GLuint geometry_shader, GLuint fragment_shader)
+dd__gl_link_program(GLuint vertex_shader,
+                    GLuint geometry_shader,
+                    GLuint fragment_shader)
 {
   GLuint program = glCreateProgram();
 
-  if (vertex_shader)
-  {
-    glAttachShader(program, vertex_shader);
-  }
-  if (geometry_shader)
-  {
-    glAttachShader(program, geometry_shader);
-  }
-  if (fragment_shader)
-  {
-    glAttachShader(program, fragment_shader);
-  }
+  if (vertex_shader) { glAttachShader(program, vertex_shader); }
+  if (geometry_shader) { glAttachShader(program, geometry_shader); }
+  if (fragment_shader) { glAttachShader(program, fragment_shader); }
 
   glLinkProgram(program);
 
@@ -125,32 +115,39 @@ dd__gl_link_program(GLuint vertex_shader, GLuint geometry_shader, GLuint fragmen
 }
 
 #define DBGDRAW_SHADER_HEADER "#version 450 core\n"
-#define DBGDRAW_STRINGIFY(x) #x
+#define DBGDRAW_STRINGIFY(x)  #x
 
-void dd__init_base_shaders_source(const char **vert_shdr, const char **frag_shdr_src);
-void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src);
+void dd__init_base_shaders_source(const char** vert_shdr,
+                                  const char** frag_shdr_src);
+void dd__init_line_shaders_source(const char** vert_shdr_src,
+                                  const char** frag_shdr_src);
 
 int32_t
-dd_backend_init(dd_ctx_t *ctx)
+dd_backend_init(dd_ctx_t* ctx)
 {
   static dd_render_backend_t backend = {0};
-  ctx->render_backend = &backend;
+  ctx->render_backend                = &backend;
 
-  const char *base_vert_shdr_src = NULL;
-  const char *base_frag_shdr_src = NULL;
+  const char* base_vert_shdr_src = NULL;
+  const char* base_frag_shdr_src = NULL;
   dd__init_base_shaders_source(&base_vert_shdr_src, &base_frag_shdr_src);
 
-  GLuint vertex_shader = dd__gl_compile_shader_src(GL_VERTEX_SHADER, base_vert_shdr_src);
-  GLuint fragment_shader = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, base_frag_shdr_src);
+  GLuint vertex_shader =
+    dd__gl_compile_shader_src(GL_VERTEX_SHADER, base_vert_shdr_src);
+  GLuint fragment_shader =
+    dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, base_frag_shdr_src);
   backend.base_program = dd__gl_link_program(vertex_shader, 0, fragment_shader);
 
-  const char *line_vert_shdr_src = NULL;
-  const char *line_frag_shdr_src = NULL;
+  const char* line_vert_shdr_src = NULL;
+  const char* line_frag_shdr_src = NULL;
   dd__init_line_shaders_source(&line_vert_shdr_src, &line_frag_shdr_src);
 
-  GLuint vertex_shader2 = dd__gl_compile_shader_src(GL_VERTEX_SHADER, line_vert_shdr_src);
-  GLuint fragment_shader2 = dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, line_frag_shdr_src);
-  backend.lines_program = dd__gl_link_program(vertex_shader2, 0, fragment_shader2);
+  GLuint vertex_shader2 =
+    dd__gl_compile_shader_src(GL_VERTEX_SHADER, line_vert_shdr_src);
+  GLuint fragment_shader2 =
+    dd__gl_compile_shader_src(GL_FRAGMENT_SHADER, line_frag_shdr_src);
+  backend.lines_program =
+    dd__gl_link_program(vertex_shader2, 0, fragment_shader2);
 
   GLCHECK(glCreateVertexArrays(1, &backend.vao));
 
@@ -158,43 +155,84 @@ dd_backend_init(dd_ctx_t *ctx)
   GLCHECK(glCreateBuffers(1, &backend.ibo));
 
   backend.vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
-  GLCHECK(glNamedBufferData(backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW));
+  GLCHECK(
+    glNamedBufferData(backend.vbo, backend.vbo_size, NULL, GL_DYNAMIC_DRAW));
   backend.ibo_size = 512 * sizeof(dd_instance_data_t);
-  GLCHECK(glNamedBufferData(backend.ibo, backend.ibo_size, NULL, GL_DYNAMIC_DRAW));
+  GLCHECK(
+    glNamedBufferData(backend.ibo, backend.ibo_size, NULL, GL_DYNAMIC_DRAW));
 
-  GLCHECK(glCreateTextures(GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id));
-  GLCHECK(glTextureBuffer(backend.line_data_texture_id, GL_RGBA32F, backend.vbo));
+  GLCHECK(
+    glCreateTextures(GL_TEXTURE_BUFFER, 1, &backend.line_data_texture_id));
+  GLCHECK(
+    glTextureBuffer(backend.line_data_texture_id, GL_RGBA32F, backend.vbo));
 
   GLuint bind_idx = 0;
-  GLuint pos_size_loc = glGetAttribLocation(backend.base_program, "in_position_and_size");
-  GLuint uv_or_normal_loc = glGetAttribLocation(backend.base_program, "in_uv_or_normal");
+  GLuint pos_size_loc =
+    glGetAttribLocation(backend.base_program, "in_position_and_size");
+  GLuint uv_or_normal_loc =
+    glGetAttribLocation(backend.base_program, "in_uv_or_normal");
   GLuint color_loc = glGetAttribLocation(backend.base_program, "in_color");
 
-  GLuint instance_pos_loc = glGetAttribLocation(backend.base_program, "in_instance_pos");
-  GLuint instance_col_loc = glGetAttribLocation(backend.base_program, "in_instance_col");
+  GLuint instance_pos_loc =
+    glGetAttribLocation(backend.base_program, "in_instance_pos");
+  GLuint instance_col_loc =
+    glGetAttribLocation(backend.base_program, "in_instance_col");
 
-  GLCHECK(glVertexArrayVertexBuffer(backend.vao, bind_idx, backend.vbo, 0, sizeof(dd_vertex_t)));
+  GLCHECK(glVertexArrayVertexBuffer(backend.vao,
+                                    bind_idx,
+                                    backend.vbo,
+                                    0,
+                                    sizeof(dd_vertex_t)));
 
   GLCHECK(glEnableVertexArrayAttrib(backend.vao, pos_size_loc));
   GLCHECK(glEnableVertexArrayAttrib(backend.vao, uv_or_normal_loc));
   GLCHECK(glEnableVertexArrayAttrib(backend.vao, color_loc));
 
-  GLCHECK(glVertexArrayAttribFormat(backend.vao, pos_size_loc, 4, GL_FLOAT, GL_FALSE, offsetof(dd_vertex_t, pos_size)));
-  GLCHECK(glVertexArrayAttribFormat(backend.vao, uv_or_normal_loc, 3, GL_FLOAT, GL_FALSE, offsetof(dd_vertex_t, uv)));
-  GLCHECK(glVertexArrayAttribFormat(backend.vao, color_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(dd_vertex_t, col)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao,
+                                    pos_size_loc,
+                                    4,
+                                    GL_FLOAT,
+                                    GL_FALSE,
+                                    offsetof(dd_vertex_t, pos_size)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao,
+                                    uv_or_normal_loc,
+                                    3,
+                                    GL_FLOAT,
+                                    GL_FALSE,
+                                    offsetof(dd_vertex_t, uv)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao,
+                                    color_loc,
+                                    4,
+                                    GL_UNSIGNED_BYTE,
+                                    GL_TRUE,
+                                    offsetof(dd_vertex_t, col)));
 
   GLCHECK(glVertexArrayAttribBinding(backend.vao, pos_size_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, uv_or_normal_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, color_loc, bind_idx));
 
   bind_idx += 1;
-  GLCHECK(glVertexArrayVertexBuffer(backend.vao, bind_idx, backend.ibo, 0, sizeof(dd_instance_data_t)));
+  GLCHECK(glVertexArrayVertexBuffer(backend.vao,
+                                    bind_idx,
+                                    backend.ibo,
+                                    0,
+                                    sizeof(dd_instance_data_t)));
 
   GLCHECK(glEnableVertexArrayAttrib(backend.vao, instance_pos_loc));
   GLCHECK(glEnableVertexArrayAttrib(backend.vao, instance_col_loc));
 
-  GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_pos_loc, 3, GL_FLOAT, GL_FALSE, offsetof(dd_instance_data_t, position)));
-  GLCHECK(glVertexArrayAttribFormat(backend.vao, instance_col_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, offsetof(dd_instance_data_t, color)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao,
+                                    instance_pos_loc,
+                                    3,
+                                    GL_FLOAT,
+                                    GL_FALSE,
+                                    offsetof(dd_instance_data_t, position)));
+  GLCHECK(glVertexArrayAttribFormat(backend.vao,
+                                    instance_col_loc,
+                                    4,
+                                    GL_UNSIGNED_BYTE,
+                                    GL_TRUE,
+                                    offsetof(dd_instance_data_t, color)));
 
   GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_pos_loc, bind_idx));
   GLCHECK(glVertexArrayAttribBinding(backend.vao, instance_col_loc, bind_idx));
@@ -205,30 +243,31 @@ dd_backend_init(dd_ctx_t *ctx)
 }
 
 int32_t
-dd_backend_render(dd_ctx_t *ctx)
+dd_backend_render(dd_ctx_t* ctx)
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t *backend = ctx->render_backend;
+  dd_render_backend_t* backend = ctx->render_backend;
 
-  if (!ctx->commands_len)
-  {
-    return DBGDRAW_ERR_OK;
-  }
+  if (!ctx->commands_len) { return DBGDRAW_ERR_OK; }
 
-  // TODO(maciej): Swap to persitent mapped buffer (glBufferStorage + glMapBufferRange) and measure the performance?
+  // TODO(maciej): Swap to persitent mapped buffer (glBufferStorage +
+  // glMapBufferRange) and measure the performance?
   if (backend->vbo_size < ctx->verts_cap * sizeof(dd_vertex_t))
   {
     backend->vbo_size = ctx->verts_cap * sizeof(dd_vertex_t);
-    GLCHECK(glNamedBufferData(backend->vbo, backend->vbo_size, NULL, GL_DYNAMIC_DRAW));
+    GLCHECK(glNamedBufferData(backend->vbo,
+                              backend->vbo_size,
+                              NULL,
+                              GL_DYNAMIC_DRAW));
   }
-  GLCHECK(glNamedBufferSubData(backend->vbo, 0, ctx->verts_len * sizeof(dd_vertex_t), ctx->verts_data));
+  GLCHECK(glNamedBufferSubData(backend->vbo,
+                               0,
+                               ctx->verts_len * sizeof(dd_vertex_t),
+                               ctx->verts_data));
 
   // Setup required ogl state
-  if (ctx->enable_depth_test)
-  {
-    GLCHECK(glEnable(GL_DEPTH_TEST));
-  }
+  if (ctx->enable_depth_test) { GLCHECK(glEnable(GL_DEPTH_TEST)); }
   GLCHECK(glEnable(GL_BLEND));
   GLCHECK(glCullFace(GL_BACK));
   GLCHECK(glEnable(GL_CULL_FACE));
@@ -239,18 +278,21 @@ dd_backend_render(dd_ctx_t *ctx)
   GLCHECK(glEnable(GL_POLYGON_OFFSET_FILL));
   GLCHECK(glPolygonOffset(1.0, 1.0));
 
-  dd_vec2_t viewport_size = dd_vec2(ctx->viewport.data[2], ctx->viewport.data[3]);
+  dd_vec2_t viewport_size =
+    dd_vec2(ctx->viewport.data[2], ctx->viewport.data[3]);
 
   static GLenum gl_modes[3];
-  gl_modes[DBGDRAW_MODE_FILL] = GL_TRIANGLES;
+  gl_modes[DBGDRAW_MODE_FILL]   = GL_TRIANGLES;
   gl_modes[DBGDRAW_MODE_STROKE] = GL_LINES;
-  gl_modes[DBGDRAW_MODE_POINT] = GL_POINTS;
+  gl_modes[DBGDRAW_MODE_POINT]  = GL_POINTS;
 
   for (int32_t i = 0; i < ctx->commands_len; ++i)
   {
-    dd_cmd_t *cmd = ctx->commands + i;
+    dd_cmd_t* cmd = ctx->commands + i;
     dd_mat4_t mvp = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, cmd->xform));
-    dd_mat4_t normal_matrix = dd_mat4_mul(ctx->proj, dd_mat4_mul(ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform))));
+    dd_mat4_t normal_matrix = dd_mat4_mul(
+      ctx->proj,
+      dd_mat4_mul(ctx->view, dd_mat4_transpose(dd_mat4_inverse(cmd->xform))));
 
     if (cmd->instance_count && cmd->instance_data)
     {
@@ -258,15 +300,22 @@ dd_backend_render(dd_ctx_t *ctx)
       {
         ctx->instance_cap = cmd->instance_count;
         backend->ibo_size = ctx->instance_cap * sizeof(dd_instance_data_t);
-        GLCHECK(glNamedBufferData(backend->ibo, backend->ibo_size, NULL, GL_DYNAMIC_DRAW));
+        GLCHECK(glNamedBufferData(backend->ibo,
+                                  backend->ibo_size,
+                                  NULL,
+                                  GL_DYNAMIC_DRAW));
       }
-      GLCHECK(glNamedBufferSubData(backend->ibo, 0, backend->ibo_size, cmd->instance_data));
+      GLCHECK(glNamedBufferSubData(backend->ibo,
+                                   0,
+                                   backend->ibo_size,
+                                   cmd->instance_data));
     }
 
     if (cmd->draw_mode == DBGDRAW_MODE_FILL)
     {
       GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
+      GLCHECK(glUniformMatrix4fv(6, 1, GL_FALSE, &normal_matrix.data[0]));
       GLCHECK(glUniform1i(1, cmd->shading_type));
       GLCHECK(glUniform1i(2, (cmd->instance_count > 0)));
 
@@ -280,11 +329,16 @@ dd_backend_render(dd_ctx_t *ctx)
 #endif
       if (cmd->instance_count <= 0)
       {
-        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
+        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode],
+                             cmd->base_index,
+                             cmd->vertex_count));
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count));
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode],
+                                      cmd->base_index,
+                                      cmd->vertex_count,
+                                      cmd->instance_count));
       }
     }
 
@@ -292,17 +346,21 @@ dd_backend_render(dd_ctx_t *ctx)
     {
       GLCHECK(glUseProgram(backend->base_program));
       GLCHECK(glUniformMatrix4fv(0, 1, GL_FALSE, &mvp.data[0]));
-      GLCHECK(glUniformMatrix4fv(6, 1, GL_FALSE, normal_matrix.data));
       GLCHECK(glUniform1i(1, 0));
       GLCHECK(glUniform1i(2, (int)(cmd->instance_count > 0)));
 
       if (cmd->instance_count <= 0)
       {
-        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count));
+        GLCHECK(glDrawArrays(gl_modes[cmd->draw_mode],
+                             cmd->base_index,
+                             cmd->vertex_count));
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode], cmd->base_index, cmd->vertex_count, cmd->instance_count));
+        GLCHECK(glDrawArraysInstanced(gl_modes[cmd->draw_mode],
+                                      cmd->base_index,
+                                      cmd->vertex_count,
+                                      cmd->instance_count));
       }
     }
 
@@ -327,7 +385,10 @@ dd_backend_render(dd_ctx_t *ctx)
       }
       else
       {
-        GLCHECK(glDrawArraysInstanced(GL_TRIANGLES, 0, 3 * cmd->vertex_count, cmd->instance_count));
+        GLCHECK(glDrawArraysInstanced(GL_TRIANGLES,
+                                      0,
+                                      3 * cmd->vertex_count,
+                                      cmd->instance_count));
       }
     }
   }
@@ -347,34 +408,59 @@ dd_backend_render(dd_ctx_t *ctx)
 
 #if DBGDRAW_HAS_TEXT_SUPPORT
 int32_t
-dd_backend_init_font_texture(dd_ctx_t *ctx, const uint8_t *data, int32_t width, int32_t height,
-                             uint32_t *tex_id)
+dd_backend_init_font_texture(dd_ctx_t* ctx,
+                             const uint8_t* data,
+                             int32_t width,
+                             int32_t height,
+                             uint32_t* tex_id)
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t *backend = ctx->render_backend;
+  dd_render_backend_t* backend = ctx->render_backend;
 
-  GLCHECK(glCreateTextures(GL_TEXTURE_2D, 1, &backend->font_tex_ids[ctx->fonts_len]));
-  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_S, GL_REPEAT));
-  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_WRAP_T, GL_REPEAT));
-  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MIN_FILTER, GL_LINEAR));
-  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len], GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+  GLCHECK(
+    glCreateTextures(GL_TEXTURE_2D, 1, &backend->font_tex_ids[ctx->fonts_len]));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len],
+                              GL_TEXTURE_WRAP_S,
+                              GL_REPEAT));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len],
+                              GL_TEXTURE_WRAP_T,
+                              GL_REPEAT));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len],
+                              GL_TEXTURE_MIN_FILTER,
+                              GL_LINEAR));
+  GLCHECK(glTextureParameteri(backend->font_tex_ids[ctx->fonts_len],
+                              GL_TEXTURE_MAG_FILTER,
+                              GL_LINEAR));
 
-  GLCHECK(glTextureStorage2D(backend->font_tex_ids[ctx->fonts_len], 1, GL_R8, width, height));
-  GLCHECK(glTextureSubImage2D(backend->font_tex_ids[ctx->fonts_len], 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, data));
+  GLCHECK(glTextureStorage2D(backend->font_tex_ids[ctx->fonts_len],
+                             1,
+                             GL_R8,
+                             width,
+                             height));
+  GLCHECK(glTextureSubImage2D(backend->font_tex_ids[ctx->fonts_len],
+                              0,
+                              0,
+                              0,
+                              width,
+                              height,
+                              GL_RED,
+                              GL_UNSIGNED_BYTE,
+                              data));
   *tex_id = backend->font_tex_ids[ctx->fonts_len];
-  backend->font_tex_attrib_loc = glGetUniformLocation(backend->base_program, "tex");
+  backend->font_tex_attrib_loc =
+    glGetUniformLocation(backend->base_program, "tex");
 
   return DBGDRAW_ERR_OK;
 }
 #endif
 
 int32_t
-dd_backend_term(dd_ctx_t *ctx)
+dd_backend_term(dd_ctx_t* ctx)
 {
   assert(ctx);
   assert(ctx->render_backend);
-  dd_render_backend_t *backend = ctx->render_backend;
+  dd_render_backend_t* backend = ctx->render_backend;
 
   glDeleteVertexArrays(1, &backend->vao);
   glDeleteBuffers(1, &backend->vbo);
@@ -389,7 +475,9 @@ dd_backend_term(dd_ctx_t *ctx)
   return DBGDRAW_ERR_OK;
 }
 
-void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
+void
+dd__init_base_shaders_source(const char** vert_shdr_src,
+                             const char** frag_shdr_src)
 {
   // clang-format off
   *vert_shdr_src =
@@ -451,13 +539,17 @@ void dd__init_base_shaders_source(const char **vert_shdr_src, const char **frag_
         }
         else
         {
-          frag_color = vec4(v_color.rgb, min(1.0, v_color.a + texture(tex, vec2(v_uv_or_normal)).r));
+          float texture_val = texture(tex, vec2(v_uv_or_normal)).r;
+          float alpha = clamp(v_color.a * texture_val, 0.0, 1.0);
+          frag_color = vec4(v_color.rgb, alpha);
         }
       });
   // clang-format on
 }
 
-void dd__init_line_shaders_source(const char **vert_shdr_src, const char **frag_shdr_src)
+void
+dd__init_line_shaders_source(const char** vert_shdr_src,
+                             const char** frag_shdr_src)
 {
   // clang-format off
   *vert_shdr_src =

@@ -1,4 +1,4 @@
-# dbgdraw
+# dbgdraw v1.0
 
 dbgdraw is a small immediate mode library for putting simple graphics on the screen. Below you can see some examples of what can be achieved in dbgdraw.
 
